@@ -1,6 +1,7 @@
 import pygame
 import random
 import streamlit as st
+import threading
 
 # Inicialización de Pygame
 pygame.init()
@@ -124,6 +125,13 @@ def juego():
     pantalla.blit(texto_final, (ANCHO // 4, ALTO // 2))
     pygame.display.update()
     pygame.time.wait(2000)
+    
+    pygame.quit()
+
+# Función para iniciar el juego en un hilo separado
+def iniciar_juego():
+    juego_thread = threading.Thread(target=juego)
+    juego_thread.start()
 
 # Configuración de Streamlit
 st.title("Space Alien")
@@ -140,6 +148,4 @@ Este juego fue creado por **Kevin Guio**.
 st.write("¡Haz clic en el botón de abajo para comenzar a jugar!")
 
 if st.button("Iniciar Juego"):
-    juego()
-
-pygame.quit()
+    iniciar_juego()
