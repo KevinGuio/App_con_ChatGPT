@@ -6,12 +6,13 @@ EMOJIS = ["🍎", "🍌", "🍉", "🍓", "🍍", "🍒", "🥭", "🍑", "🍊"
 
 # Mezclar los emojis y duplicarlos para hacer las parejas
 def generar_tablero():
+    """Genera un tablero con las cartas mezcladas"""
     tablero = EMOJIS + EMOJIS
     random.shuffle(tablero)
     return tablero
 
 # Función para mostrar el tablero de juego en formato matriz 4x4
-def mostrar_tablero(tablero, cartas_destapadas):
+def mostrar_tablero(tablero, cartas_destapadas, cartas_seleccionadas):
     """ Muestra el tablero en forma de matriz 4x4 con cartas destapadas o cubiertas """
     st.write("### Tablero de juego:")
     botones = []
@@ -19,7 +20,7 @@ def mostrar_tablero(tablero, cartas_destapadas):
         fila = []
         for j in range(4):  # Columnas
             carta = i * 4 + j
-            if carta in cartas_destapadas:
+            if carta in cartas_destapadas or carta in cartas_seleccionadas:
                 fila.append(tablero[carta])  # Si está destapada, mostramos el emoji
             else:
                 fila.append("❓")  # Si está tapada, mostramos el signo de interrogación
@@ -31,7 +32,7 @@ def mostrar_tablero(tablero, cartas_destapadas):
         for j in range(4):
             carta = i * 4 + j
             with cols[j]:
-                if carta in cartas_destapadas:
+                if carta in cartas_destapadas or carta in cartas_seleccionadas:
                     st.write(tablero[carta])
                 else:
                     if st.button(f"Card {carta}", key=carta):
@@ -68,7 +69,7 @@ def juego():
     ultimo_emoji = st.session_state.ultimo_emoji
 
     # Mostrar el tablero de juego en formato matriz
-    mostrar_tablero(tablero, cartas_destapadas)
+    mostrar_tablero(tablero, cartas_destapadas, cartas_seleccionadas)
 
     # Mostrar el emoji seleccionado inmediatamente al presionar un botón
     if ultimo_emoji:
