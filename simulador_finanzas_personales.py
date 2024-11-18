@@ -30,9 +30,19 @@ def agregar_registro(tipo, categoria, cantidad, fecha):
 # Función para generar reportes
 def generar_reporte(tipo, rango):
     df = pd.DataFrame(st.session_state.data[tipo])
-    df["Fecha"] = pd.to_datetime(df["Fecha"])
-    df_rango = df[df["Fecha"].between(rango[0], rango[1])]
-    return df_rango.groupby("Categoría").sum()["Cantidad"]
+    
+    if not df.empty:
+        # Asegurarse de que la columna "Cantidad" sea numérica
+        df["Cantidad"] = pd.to_numeric(df["Cantidad"], errors="coerce")
+        df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+        
+        # Filtrar por rango de fechas
+        df_rango = df[df["Fecha"].between(rango[0], rango[1])]
+        
+        # Agrupar por categoría y sumar
+        return df_rango.groupby("Categoría").sum(numeric_only=True)["Cantidad"]
+    else:
+        return pd.Series(dtype="float64")
 
 # Sección para gestionar presupuestos, ingresos, gastos y metas
 st.sidebar.header("Gestión de Finanzas")
