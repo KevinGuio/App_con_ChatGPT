@@ -1,102 +1,66 @@
 import streamlit as st
-import pandas as pd
+import random
 
-# Descripción de la app
-st.title("Cálculo del Promedio Académico Ponderado Acumulado (PAPA)")
-st.write("Esta app fue elaborada por Kevin Guio.")
-st.write("""
-Esta aplicación permite calcular el **Promedio Académico Ponderado Acumulado (PAPA)** de un semestre.
-Puedes ingresar las materias vistas, las calificaciones obtenidas y los créditos de cada asignatura.
-También podrás calcular el PAPA global y por tipología de asignatura.
-""")
+# Definir los emojis que usaremos en el juego
+EMOJIS = ["😊", "😎", "😍", "🤣", "🤔", "😜", "😇", "😎", "😈", "🎉", "🍀", "🍕"]
 
-# Tipologías de asignatura
-tipologias = [
-    "Disciplinar Optativa",
-    "Fundamentación Obligatoria",
-    "Fundamentación Optativa",
-    "Disciplinar Obligatoria",
-    "Libre Elección",
-    "Trabajo de Grado",
-    "Nivelación"
-]
+# Mezclar los emojis y duplicarlos para hacer las parejas
+def generar_tablero():
+    tablero = EMOJIS + EMOJIS
+    random.shuffle(tablero)
+    return tablero
 
-# Función para calcular el PAPA global
-def calcular_papa_global(df):
-    """
-    Calcula el Promedio Académico Ponderado Acumulado global (PAPA) usando los créditos y las calificaciones.
+# Función para mostrar el tablero de juego en formato matriz
+def mostrar_tablero(tablero, cartas_destapadas):
+    """ Muestra el tablero en forma de matriz 4x4 con cartas destapadas o cubiertas """
+    st.write("### Tablero de juego:")
+    botones = []
+    for i in range(4):  # Filas
+        fila = []
+        for j in range(4):  # Columnas
+            carta = i * 4 + j
+            if carta in cartas_destapadas:
+                fila.append(tablero[carta])  # Si está destapada, mostramos el emoji
+            else:
+                fila.append("❓")  # Si está tapada, mostramos el signo de interrogación
+        botones.append(fila)
+    return botones
+
+# Función principal del juego
+def juego():
+    st.title("Paremoji")
+    st.write("""
+    **Cómo jugar:**
+    - Encuentra todas las parejas de emojis.
+    - Haz clic en dos cartas para destaparlas.
+    - Si las cartas son una pareja, se quedan destapadas.
+    - Si no, se vuelven a tapar.
+    - ¡Gana al encontrar todas las parejas!
+    """)
+    st.write("Juego creado por **Kevin Guio**")
     
-    Parameters:
-        df (DataFrame): DataFrame que contiene las materias, sus calificaciones y créditos.
-    
-    Returns:
-        float: El PAPA global.
-    """
-    if df.empty:
-        return 0.0
-    
-    total_creditos = df["Créditos"].sum()
-    total_ponderado = (df["Calificación"] * df["Créditos"]).sum()
-    
-    papa_global = total_ponderado / total_creditos if total_creditos > 0 else 0.0
-    return round(papa_global, 2)
+    # Inicializar las variables del juego
+    if 'tablero' not in st.session_state:
+        st.session_state.tablero = generar_tablero()
+        st.session_state.cartas_destapadas = []
+        st.session_state.intentos = 0
+        st.session_state.parejas_encontradas = 0
+        st.session_state.cartas_seleccionadas = []
 
-# Función para calcular el PAPA por tipología
-def calcular_papa_por_tipologia(df, tipologia):
-    """
-    Calcula el Promedio Académico Ponderado Acumulado por tipología de asignatura.
-    
-    Parameters:
-        df (DataFrame): DataFrame que contiene las materias, sus calificaciones y créditos.
-        tipologia (str): La tipología de la asignatura para la cual se desea calcular el PAPA.
-    
-    Returns:
-        float: El PAPA para la tipología seleccionada.
-    """
-    df_tipologia = df[df["Tipología"] == tipologia]
-    
-    return calcular_papa_global(df_tipologia)
+    tablero = st.session_state.tablero
+    cartas_destapadas = st.session_state.cartas_destapadas
+    intentos = st.session_state.intentos
+    parejas_encontradas = st.session_state.parejas_encontradas
+    cartas_seleccionadas = st.session_state.cartas_seleccionadas
 
-# Formulario para ingresar materias, calificaciones, créditos y tipología
-st.sidebar.header("Ingrese los datos de sus materias")
-materias = []
-calificaciones = []
-creditos = []
-tipologias_seleccionadas = []
+    # Mostrar el tablero de juego en formato matriz
+    botones = mostrar_tablero(tablero, cartas_destapadas)
 
-# Crear formulario
-num_materias = st.sidebar.number_input("Número de materias:", min_value=1, max_value=20, value=1)
-
-for i in range(num_materias):
-    st.sidebar.subheader(f"Materia {i+1}")
-    materia = st.sidebar.text_input(f"Nombre de la materia {i+1}", key=f"materia_{i}")
-    calificacion = st.sidebar.number_input(f"Calificación de {materia}", min_value=0.0, max_value=5.0, step=0.1, key=f"calificacion_{i}")
-    credito = st.sidebar.number_input(f"Créditos de {materia}", min_value=1, max_value=6, value=3, key=f"credito_{i}")
-    tipologia = st.sidebar.selectbox(f"Tipología de {materia}", tipologias, key=f"tipologia_{i}")
-    
-    materias.append(materia)
-    calificaciones.append(calificacion)
-    creditos.append(credito)
-    tipologias_seleccionadas.append(tipologia)
-
-# Crear DataFrame con los datos ingresados
-df = pd.DataFrame({
-    "Materia": materias,
-    "Calificación": calificaciones,
-    "Créditos": creditos,
-    "Tipología": tipologias_seleccionadas
-})
-
-# Mostrar los datos ingresados
-st.subheader("Materias ingresadas")
-st.write(df)
-
-# Calcular el PAPA global
-papa_global = calcular_papa_global(df)
-st.subheader(f"PAPA Global: {papa_global}")
-
-# Calcular el PAPA por tipología
-st.subheader("PAPA por tipología")
-for tipologia in tipologias:
-    papa_tipologia = calcular_papa_por_tipologia(df, tipologia)
-    st.write(f"{tipologia}: {papa_tipologia}")
+    # Interacción con el usuario: seleccionar cartas
+    selected_card = None
+    for i in range(4):
+        for j in range(4):
+            carta = i * 4 + j
+            if st.button(f"Card {carta}", key=carta):
+                selected_card = carta
+                if selected_card not in cart
