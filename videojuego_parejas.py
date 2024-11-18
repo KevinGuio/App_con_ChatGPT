@@ -11,16 +11,18 @@ def generar_tablero():
     random.shuffle(tablero)
     return tablero
 
-# Mostrar el juego
+# Función para mostrar el tablero de juego como una matriz
 def mostrar_tablero(tablero, cartas_destapadas):
-    """ Muestra el tablero con las cartas destapadas o cubiertas """
-    for i in range(len(tablero)):
-        if i in cartas_destapadas:
-            st.write(f"**{tablero[i]}**", end="   ")
-        else:
-            st.write("❓", end="   ")
-        if (i + 1) % 4 == 0:
-            st.write()  # Saltar una línea después de cada fila de 4 cartas
+    """ Muestra el tablero en forma de matriz 4x4 con cartas destapadas o cubiertas """
+    st.write("### Tablero de juego:")
+    for i in range(4):  # Filas
+        for j in range(4):  # Columnas
+            carta = i * 4 + j
+            if carta in cartas_destapadas:
+                st.write(f"**{tablero[carta]}**", end="   ")
+            else:
+                st.write("❓", end="   ")
+        st.write()  # Nueva línea después de cada fila
 
 # Función principal del juego
 def juego():
@@ -47,6 +49,7 @@ def juego():
     intentos = st.session_state.intentos
     parejas_encontradas = st.session_state.parejas_encontradas
 
+    # Mostrar el tablero de juego en formato matriz
     mostrar_tablero(tablero, cartas_destapadas)
 
     # Seleccionar dos cartas para destapar
