@@ -78,6 +78,7 @@ def juego():
     # Comprobar las cartas seleccionadas
     if len(cartas_seleccionadas) == 2:
         carta1, carta2 = cartas_seleccionadas
+        st.write(f"Has seleccionado: {tablero[carta1]} y {tablero[carta2]}")  # Mostrar las dos cartas seleccionadas
         if tablero[carta1] == tablero[carta2]:
             st.session_state.cartas_destapadas.append(carta1)
             st.session_state.cartas_destapadas.append(carta2)
