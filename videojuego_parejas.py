@@ -70,7 +70,7 @@ def juego():
     # Mostrar el tablero de juego en formato matriz
     mostrar_tablero(tablero, cartas_destapadas)
 
-    # Mostrar el emoji seleccionado
+    # Mostrar el emoji seleccionado inmediatamente al presionar un botón
     if ultimo_emoji:
         st.write(f"Has seleccionado el emoji: {ultimo_emoji}")
 
