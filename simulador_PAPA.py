@@ -32,19 +32,13 @@ def calcular_papa_global(df):
     Returns:
         float: El PAPA global.
     """
-    # Validar si el DataFrame tiene los datos necesarios
     if df.empty:
         return 0.0
     
-    # Calcular el total de créditos
     total_creditos = df["Créditos"].sum()
-    
-    # Calcular el total ponderado (calificación * créditos)
     total_ponderado = (df["Calificación"] * df["Créditos"]).sum()
     
-    # Calcular el PAPA global
     papa_global = total_ponderado / total_creditos if total_creditos > 0 else 0.0
-    
     return round(papa_global, 2)
 
 # Función para calcular el PAPA por tipología
@@ -75,10 +69,10 @@ num_materias = st.sidebar.number_input("Número de materias:", min_value=1, max_
 
 for i in range(num_materias):
     st.sidebar.subheader(f"Materia {i+1}")
-    materia = st.sidebar.text_input(f"Nombre de la materia {i+1}")
-    calificacion = st.sidebar.number_input(f"Calificación de {materia}", min_value=0.0, max_value=5.0, step=0.1)
-    credito = st.sidebar.number_input(f"Créditos de {materia}", min_value=1, max_value=6, value=3)
-    tipologia = st.sidebar.selectbox(f"Tipología de {materia}", tipologias)
+    materia = st.sidebar.text_input(f"Nombre de la materia {i+1}", key=f"materia_{i}")
+    calificacion = st.sidebar.number_input(f"Calificación de {materia}", min_value=0.0, max_value=5.0, step=0.1, key=f"calificacion_{i}")
+    credito = st.sidebar.number_input(f"Créditos de {materia}", min_value=1, max_value=6, value=3, key=f"credito_{i}")
+    tipologia = st.sidebar.selectbox(f"Tipología de {materia}", tipologias, key=f"tipologia_{i}")
     
     materias.append(materia)
     calificaciones.append(calificacion)
@@ -106,4 +100,3 @@ st.subheader("PAPA por tipología")
 for tipologia in tipologias:
     papa_tipologia = calcular_papa_por_tipologia(df, tipologia)
     st.write(f"{tipologia}: {papa_tipologia}")
-
