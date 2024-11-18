@@ -71,4 +71,34 @@ def juego():
     if len(cartas_seleccionadas) == 2:
         carta1, carta2 = cartas_seleccionadas
         if tablero[carta1] == tablero[carta2]:
-            st.session_state.cart
+            st.session_state.cartas_destapadas.append(carta1)
+            st.session_state.cartas_destapadas.append(carta2)
+            st.session_state.parejas_encontradas += 1
+            st.write(f"¡Encontraste una pareja! {tablero[carta1]} y {tablero[carta2]}")
+        else:
+            st.write("¡No es una pareja!")
+        
+        # Incrementar intentos
+        st.session_state.intentos += 1
+
+        # Resetear las cartas seleccionadas
+        st.session_state.cartas_seleccionadas = []
+
+    # Ver el progreso
+    st.write(f"Parejas encontradas: {parejas_encontradas}")
+    st.write(f"Intentos realizados: {intentos}")
+
+    # Comprobar si el juego ha terminado
+    if len(st.session_state.cartas_destapadas) == len(tablero):
+        st.write("¡Felicidades! Has encontrado todas las parejas.")
+
+    # Reiniciar el juego
+    if st.button("Reiniciar Juego"):
+        st.session_state.tablero = generar_tablero()
+        st.session_state.cartas_destapadas = []
+        st.session_state.intentos = 0
+        st.session_state.parejas_encontradas = 0
+        st.session_state.cartas_seleccionadas = []
+
+if __name__ == "__main__":
+    juego()
