@@ -36,6 +36,7 @@ def mostrar_tablero(tablero, cartas_destapadas):
                 else:
                     if st.button(f"Card {carta}", key=carta):
                         st.session_state.cartas_seleccionadas.append(carta)
+                        st.session_state.ultimo_emoji = tablero[carta]  # Guardamos el emoji seleccionado
 
 # Función principal del juego
 def juego():
@@ -57,15 +58,21 @@ def juego():
         st.session_state.intentos = 0
         st.session_state.parejas_encontradas = 0
         st.session_state.cartas_seleccionadas = []
+        st.session_state.ultimo_emoji = None  # Para mostrar el último emoji seleccionado
 
     tablero = st.session_state.tablero
     cartas_destapadas = st.session_state.cartas_destapadas
     intentos = st.session_state.intentos
     parejas_encontradas = st.session_state.parejas_encontradas
     cartas_seleccionadas = st.session_state.cartas_seleccionadas
+    ultimo_emoji = st.session_state.ultimo_emoji
 
     # Mostrar el tablero de juego en formato matriz
     mostrar_tablero(tablero, cartas_destapadas)
+
+    # Mostrar el emoji seleccionado
+    if ultimo_emoji:
+        st.write(f"Has seleccionado el emoji: {ultimo_emoji}")
 
     # Comprobar las cartas seleccionadas
     if len(cartas_seleccionadas) == 2:
@@ -83,6 +90,7 @@ def juego():
 
         # Resetear las cartas seleccionadas
         st.session_state.cartas_seleccionadas = []
+        st.session_state.ultimo_emoji = None  # Reseteamos el emoji mostrado
 
     # Ver el progreso
     st.write(f"Parejas encontradas: {parejas_encontradas}")
@@ -99,6 +107,7 @@ def juego():
         st.session_state.intentos = 0
         st.session_state.parejas_encontradas = 0
         st.session_state.cartas_seleccionadas = []
+        st.session_state.ultimo_emoji = None
 
 if __name__ == "__main__":
     juego()
