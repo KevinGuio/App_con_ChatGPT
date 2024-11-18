@@ -1,9 +1,8 @@
 import streamlit as st
 import random
-import time
 
 # Definir los emojis que usaremos en el juego
-EMOJIS = ["😊", "😎", "😍", "🤣", "🤔", "😜", "😇", "😎", "😈", "🎉", "🍀", "🍕"]
+EMOJIS = ["🍎", "🍌", "🍉", "🍓", "🍍", "🍒", "🥭", "🍑", "🍊", "🍇", "🍋", "🍒"]
 
 # Mezclar los emojis y duplicarlos para hacer las parejas
 def generar_tablero():
@@ -11,18 +10,32 @@ def generar_tablero():
     random.shuffle(tablero)
     return tablero
 
-# Función para mostrar el tablero de juego como una matriz
+# Función para mostrar el tablero de juego en formato matriz 4x4
 def mostrar_tablero(tablero, cartas_destapadas):
     """ Muestra el tablero en forma de matriz 4x4 con cartas destapadas o cubiertas """
     st.write("### Tablero de juego:")
+    botones = []
     for i in range(4):  # Filas
+        fila = []
         for j in range(4):  # Columnas
             carta = i * 4 + j
             if carta in cartas_destapadas:
-                st.write(f"**{tablero[carta]}**", end="   ")
+                fila.append(tablero[carta])  # Si está destapada, mostramos el emoji
             else:
-                st.write("❓", end="   ")
-        st.write()  # Nueva línea después de cada fila
+                fila.append("❓")  # Si está tapada, mostramos el signo de interrogación
+        botones.append(fila)
+
+    # Mostrar el tablero en forma de botones interactivos
+    for i in range(4):
+        cols = st.columns(4)  # Crear 4 columnas para mostrar las cartas
+        for j in range(4):
+            carta = i * 4 + j
+            with cols[j]:
+                if carta in cartas_destapadas:
+                    st.write(tablero[carta])
+                else:
+                    if st.button(f"Card {carta}", key=carta):
+                        st.session_state.cartas_seleccionadas.append(carta)
 
 # Función principal del juego
 def juego():
@@ -43,45 +56,19 @@ def juego():
         st.session_state.cartas_destapadas = []
         st.session_state.intentos = 0
         st.session_state.parejas_encontradas = 0
+        st.session_state.cartas_seleccionadas = []
 
     tablero = st.session_state.tablero
     cartas_destapadas = st.session_state.cartas_destapadas
     intentos = st.session_state.intentos
     parejas_encontradas = st.session_state.parejas_encontradas
+    cartas_seleccionadas = st.session_state.cartas_seleccionadas
 
     # Mostrar el tablero de juego en formato matriz
     mostrar_tablero(tablero, cartas_destapadas)
 
-    # Seleccionar dos cartas para destapar
-    carta1 = st.selectbox("Selecciona la primera carta", list(range(16)), key="carta1")
-    carta2 = st.selectbox("Selecciona la segunda carta", list(range(16)), key="carta2")
-
-    if st.button("Comprobar"):
-        st.session_state.intentos += 1
-
-        # Verificar si las cartas seleccionadas son una pareja
-        if tablero[carta1] == tablero[carta2] and carta1 != carta2:
-            st.session_state.parejas_encontradas += 1
-            st.session_state.cartas_destapadas.append(carta1)
-            st.session_state.cartas_destapadas.append(carta2)
-            st.write(f"¡Es una pareja! 💖")
-        else:
-            st.write("¡No es una pareja! 😥")
-        
-        # Actualizar el estado de las cartas destapadas
-        if len(st.session_state.cartas_destapadas) == len(tablero):
-            st.write(f"¡Felicidades! Has encontrado todas las parejas en {intentos} intentos.")
-
-    # Ver el progreso
-    st.write(f"Parejas encontradas: {parejas_encontradas}")
-    st.write(f"Intentos realizados: {intentos}")
-
-    # Reiniciar el juego
-    if st.button("Reiniciar Juego"):
-        st.session_state.tablero = generar_tablero()
-        st.session_state.cartas_destapadas = []
-        st.session_state.intentos = 0
-        st.session_state.parejas_encontradas = 0
-
-if __name__ == "__main__":
-    juego()
+    # Comprobar las cartas seleccionadas
+    if len(cartas_seleccionadas) == 2:
+        carta1, carta2 = cartas_seleccionadas
+        if tablero[carta1] == tablero[carta2]:
+            st.session_state.cart
