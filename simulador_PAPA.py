@@ -3,6 +3,7 @@ import pandas as pd
 
 # Descripción de la app
 st.title("Cálculo del Promedio Académico Ponderado Acumulado (PAPA)")
+st.write("Esta app fue elaborada por Kevin Guio.")
 st.write("""
 Esta aplicación permite calcular el **Promedio Académico Ponderado Acumulado (PAPA)** de un semestre.
 Puedes ingresar las materias vistas, las calificaciones obtenidas y los créditos de cada asignatura.
