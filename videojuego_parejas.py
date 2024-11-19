@@ -62,7 +62,7 @@ def juego():
     mostrar_tablero(tablero, cartas_destapadas, cartas_seleccionadas)
 
     # Botón para voltear cartas
-    if st.button("Voltear cartas"):
+    if st.button("Verificar"):
         if len(cartas_seleccionadas) == 2:
             carta1, carta2 = cartas_seleccionadas
             st.session_state.intentos += 1
