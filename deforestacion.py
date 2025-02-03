@@ -3,38 +3,67 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-import numpy as np
 
 @st.cache_data
-def cargar_y_limpiar_datos(url):
+def cargar_y_limpiar_datos(url_o_archivo):
     """
-    Carga y limpia los datos de deforestación desde un archivo CSV.
+    Carga y limpia los datos de deforestación desde un archivo CSV (puede ser URL o archivo local).
     Realiza interpolación para valores faltantes y convierte a un GeoDataFrame.
 
     Args:
-        url (str): URL o ruta del archivo CSV con los datos.
+        url_o_archivo (str or file): URL o archivo local con los datos CSV.
 
     Returns:
         gpd.GeoDataFrame: GeoDataFrame con los datos limpios e interpolados.
     """
-    datos = pd.read_csv(url)
-    
-    # Interpolación para columnas numéricas y fechas
-    for col in datos.columns:
-        if pd.api.types.is_numeric_dtype(datos[col]):
-            datos[col] = datos[col].interpolate(method='linear')
-        elif pd.api.types.is_datetime64_any_dtype(datos[col]):
-            datos[col] = pd.to_datetime(datos[col], errors='coerce')
-            datos[col] = datos[col].interpolate(method='time')
-    
-    # Interpolación para columnas categóricas
+    if isinstance(url_o_archivo, str):
+        datos = pd.read_csv(url_o_archivo)
+    else:
+        # Si se carga un archivo desde el dispositivo
+        datos = pd.read_csv(url_o_archivo)
+
+    # Interpolación para los valores numéricos
+    datos.iloc[:, 3:] = datos.iloc[:, 3:].interpolate(method="linear", axis=0, limit_direction="both")
+
+    # Rellenar valores nulos de tipo string con la moda
     modos_categoricos = datos.select_dtypes(include=["object"]).mode().iloc[0]
     datos[datos.select_dtypes(include=["object"]).columns] = datos[datos.select_dtypes(include=["object"]).columns].fillna(modos_categoricos)
-    
-    # Crear GeoDataFrame
+
+    # Convertir a GeoDataFrame usando las columnas de latitud y longitud
     return gpd.GeoDataFrame(
         datos, geometry=gpd.points_from_xy(datos["Longitud"], datos["Latitud"])
     )
+
+def cargar_datos():
+    """
+    Permite al usuario cargar un archivo CSV desde su dispositivo o ingresar una URL.
+
+    Returns:
+        gpd.GeoDataFrame: GeoDataFrame con los datos de deforestación.
+    """
+    st.title("Cargar Datos de Deforestación")
+
+    # Opción para cargar archivo desde el dispositivo
+    archivo_subido = st.file_uploader("Sube un archivo CSV", type="csv")
+
+    # Opción para cargar desde una URL
+    url_archivo = st.text_input("O ingresa la URL del archivo CSV")
+
+    if archivo_subido:
+        # Si el usuario sube un archivo
+        st.write("Archivo cargado desde tu dispositivo")
+        gdf = cargar_y_limpiar_datos(archivo_subido)
+        return gdf
+
+    elif url_archivo:
+        # Si el usuario ingresa una URL
+        st.write(f"Archivo cargado desde la URL: {url_archivo}")
+        gdf = cargar_y_limpiar_datos(url_archivo)
+        return gdf
+
+    else:
+        st.warning("Por favor, sube un archivo o ingresa una URL.")
+        return None
 
 @st.cache_data
 def cargar_mapa_base(url_geopackage):
@@ -111,14 +140,13 @@ def crear_mapa_personalizado(gdf, mapa_base, filtros):
     Returns:
         None
     """
-    # Aplicar filtros con vectorización
-    gdf_filtrado = gdf
+    gdf_filtrado = gdf.copy()
     for columna, rango in filtros.items():
         if gdf[columna].dtype == "O":
             gdf_filtrado = gdf_filtrado[gdf_filtrado[columna].isin(rango)]
         else:
-            gdf_filtrado = gdf_filtrado[gdf_filtrado[columna].between(rango[0], rango[1])]
-    
+            gdf_filtrado = gdf_filtrado[(gdf_filtrado[columna] >= rango[0]) & (gdf_filtrado[columna] <= rango[1])]
+
     fig, ax = plt.subplots(figsize=(12, 8))
     mapa_base.plot(ax=ax, color="lightgrey", edgecolor="black")
     gdf_filtrado.plot(ax=ax, color="red", markersize=10, alpha=0.7)
@@ -127,24 +155,9 @@ def crear_mapa_personalizado(gdf, mapa_base, filtros):
     ax.set_ylabel("Latitud")
     st.pyplot(fig)
 
-def realizar_analisis_clusters(gdf):
-    """
-    Realiza un análisis de clústeres de superficies deforestadas utilizando KMeans.
-
-    Args:
-        gdf (gpd.GeoDataFrame): GeoDataFrame con los datos de deforestación.
-
-    Returns:
-        pd.DataFrame: Datos con las etiquetas de clúster asignadas.
-    """
-    X = gdf[["Latitud", "Longitud", "Superficie_Deforestada"]].dropna()
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    gdf["Cluster"] = kmeans.fit_predict(X)
-    return gdf
-
 def crear_grafico_torta(gdf):
     """
-    Crea un gráfico de torta con la distribución de la superficie deforestada por tipo de vegetación.
+    Crea un gráfico de torta según el tipo de vegetación.
 
     Args:
         gdf (gpd.GeoDataFrame): GeoDataFrame con los datos de deforestación.
@@ -152,10 +165,31 @@ def crear_grafico_torta(gdf):
     Returns:
         None
     """
-    distribucion = gdf.groupby("Tipo_Vegetacion")["Superficie_Deforestada"].sum()
-    fig, ax = plt.subplots()
-    ax.pie(distribucion, labels=distribucion.index, autopct='%1.1f%%', startangle=90)
-    ax.axis("equal")  # Equal aspect ratio ensures that pie is drawn as a circle.
+    distribucion_vegetacion = gdf["Tipo_Vegetacion"].value_counts()
+    fig, ax = plt.subplots(figsize=(8, 8))
+    distribucion_vegetacion.plot.pie(autopct='%1.1f%%', startangle=90, ax=ax, cmap="Set3")
+    ax.set_title("Distribución de Deforestación por Tipo de Vegetación")
+    st.pyplot(fig)
+
+def realizar_analisis_clusters(gdf):
+    """
+    Realiza un análisis de clústeres de las zonas deforestadas utilizando KMeans.
+
+    Args:
+        gdf (gpd.GeoDataFrame): GeoDataFrame con los datos de deforestación.
+
+    Returns:
+        None
+    """
+    datos_clustering = gdf[["Latitud", "Longitud", "Superficie_Deforestada"]].dropna()
+    kmeans = KMeans(n_clusters=3, random_state=42)
+    gdf["Cluster"] = kmeans.fit_predict(datos_clustering)
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    gdf.plot(ax=ax, column="Cluster", legend=True, cmap="viridis", markersize=10)
+    ax.set_title("Análisis de Clústeres de Superficies Deforestadas")
+    ax.set_xlabel("Longitud")
+    ax.set_ylabel("Latitud")
     st.pyplot(fig)
 
 # URL de los datos
@@ -163,7 +197,10 @@ url_datos = "https://raw.githubusercontent.com/gabrielawad/programacion-para-ing
 url_mapa_base = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
 
 # Cargar y limpiar los datos
-gdf_datos_limpios = cargar_y_limpiar_datos(url_datos)
+gdf_datos_limpios = cargar_datos()
+if gdf_datos_limpios is None:
+    st.stop()  # Detiene la ejecución si no se cargaron los datos
+
 mapa_base = cargar_mapa_base(url_mapa_base)
 
 # Crear la app en Streamlit
@@ -200,16 +237,6 @@ crear_mapa_deforestacion(
     gdf_datos_limpios, "Precipitacion", mapa_base, "Zonas Deforestadas por Precipitación"
 )
 
-# Análisis de clústeres
-st.header("Análisis de Clústeres de Superficies Deforestadas")
-gdf_clusterizado = realizar_analisis_clusters(gdf_datos_limpios)
-st.subheader("Zonas Deforestadas por Clúster")
-crear_mapa_deforestacion(gdf_clusterizado, "Cluster", mapa_base, "Clústeres de Zonas Deforestadas")
-
-# Gráfico de torta por tipo de vegetación
-st.header("Distribución de la Superficie Deforestada por Tipo de Vegetación")
-crear_grafico_torta(gdf_datos_limpios)
-
 # Mapas personalizados
 st.header("Mapa Personalizado de Zonas Deforestadas")
 
@@ -236,3 +263,9 @@ for i in range(1, 5):
 
 if st.button("Generar Mapa Personalizado"):
     crear_mapa_personalizado(gdf_datos_limpios, mapa_base, filtros)
+
+# Gráfico de torta
+crear_grafico_torta(gdf_datos_limpios)
+
+# Análisis de clústeres
+realizar_analisis_clusters(gdf_datos_limpios)
