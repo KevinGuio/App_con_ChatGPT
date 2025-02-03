@@ -3,5 +3,5 @@ pandas
 matplotlib
 pygame
 geopandas
-sklearn
+scikit-learn
 numpy
