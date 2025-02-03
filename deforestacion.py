@@ -68,6 +68,23 @@ def analizar_datos_deforestacion(gdf):
 
     return resultados
 
+def cargar_mapa_sudamerica(url_geopackage):
+    """
+    Carga un mapa de Sudamérica desde un GeoPackage y recorta la geometría.
+    
+    Args:
+        url_geopackage (str): URL del GeoPackage con los datos de mapa base.
+    
+    Returns:
+        gpd.GeoDataFrame: GeoDataFrame con el mapa de Sudamérica.
+    """
+    mapa_base = gpd.read_file(url_geopackage)
+    
+    # Filtramos solo Sudamérica por su nombre en el campo 'name' (verifica que este campo exista en tu archivo)
+    sudamerica = mapa_base[mapa_base['continent'] == 'South America']
+    
+    return sudamerica
+
 def crear_mapa_deforestacion(gdf, columna, mapa_base, titulo):
     """
     Crea y muestra un mapa de las zonas deforestadas basado en una columna especificada.
@@ -122,7 +139,9 @@ url_mapa_base = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin
 
 # Cargar y limpiar los datos
 gdf_datos_limpios = cargar_y_limpiar_datos(url_datos)
-mapa_base = cargar_mapa_base(url_mapa_base)
+
+# Cargar el mapa base de Sudamérica
+mapa_base = cargar_mapa_sudamerica(url_mapa_base)
 
 # Crear la app en Streamlit
 st.title("Análisis de Datos de Deforestación")
