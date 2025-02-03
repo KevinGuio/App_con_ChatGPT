@@ -192,8 +192,7 @@ def realizar_analisis_clusters(gdf):
     ax.set_ylabel("Latitud")
     st.pyplot(fig)
 
-# URL de los datos
-url_datos = "https://raw.githubusercontent.com/gabrielawad/programacion-para-ingenieria/refs/heads/main/archivos-datos/aplicaciones/deforestacion.csv"
+# URL base del mapa mundial
 url_mapa_base = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
 
 # Cargar y limpiar los datos
