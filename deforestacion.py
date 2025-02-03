@@ -254,14 +254,15 @@ crear_mapa_deforestacion(
 # Mapas personalizados
 st.header("Mapa Personalizado de Zonas Deforestadas")
 
-columnas = gdf_datos_limpios.columns.tolist()
+# Excluir la columna "geometry" de las columnas disponibles para selección
+columnas = [col for col in gdf_datos_limpios.columns if col != "geometry"]
 filtros = {}
 
 st.write("Selecciona hasta 4 variables para filtrar el mapa:")
 for i in range(1, 5):
     columna = st.selectbox(f"Variable {i}", [None] + columnas, key=f"var_{i}")
     if columna:
-        if gdf_datos_limpios[columna].dtype == "O":
+        if gdf_datos_limpios[columna].dtype == "O":  # Si es de tipo objeto (categoría)
             categorias = st.multiselect(f"Categorías para {columna}", gdf_datos_limpios[columna].unique(), key=f"cat_{i}")
             if categorias:
                 filtros[columna] = categorias
