@@ -81,14 +81,37 @@ def crear_mapa_deforestacion(gdf, columna, mapa_base, titulo):
     Returns:
         None
     """
-    # Filtrar el mapa base y los datos para Sudamérica
-    mapa_base_sa = mapa_base[mapa_base["CONTINENT"] == "South America"]
-    gdf_sa = gdf.cx[-81:-34, -56:13]  # Coordenadas aproximadas de Sudamérica
+    fig, ax = plt.subplots(figsize=(12, 8))
+    mapa_base.plot(ax=ax, color="lightgrey", edgecolor="black")
+    gdf.plot(ax=ax, column=columna, legend=True, markersize=10, cmap="viridis")
+    ax.set_title(titulo, fontsize=16)
+    ax.set_xlabel("Longitud")
+    ax.set_ylabel("Latitud")
+    st.pyplot(fig)
+
+def crear_mapa_personalizado(gdf, mapa_base, filtros):
+    """
+    Crea y muestra un mapa personalizado basado en los filtros seleccionados por el usuario.
+
+    Args:
+        gdf (gpd.GeoDataFrame): GeoDataFrame con los datos de deforestación.
+        mapa_base (gpd.GeoDataFrame): GeoDataFrame con el mapa base mundial.
+        filtros (dict): Diccionario con las variables, sus rangos y/o categorías seleccionadas.
+
+    Returns:
+        None
+    """
+    gdf_filtrado = gdf.copy()
+    for columna, rango in filtros.items():
+        if gdf[columna].dtype == "O":
+            gdf_filtrado = gdf_filtrado[gdf_filtrado[columna].isin(rango)]
+        else:
+            gdf_filtrado = gdf_filtrado[(gdf_filtrado[columna] >= rango[0]) & (gdf_filtrado[columna] <= rango[1])]
 
     fig, ax = plt.subplots(figsize=(12, 8))
-    mapa_base_sa.plot(ax=ax, color="lightgrey", edgecolor="black")
-    gdf_sa.plot(ax=ax, column=columna, legend=True, markersize=10, cmap="viridis")
-    ax.set_title(titulo, fontsize=16)
+    mapa_base.plot(ax=ax, color="lightgrey", edgecolor="black")
+    gdf_filtrado.plot(ax=ax, color="red", markersize=10, alpha=0.7)
+    ax.set_title("Mapa Personalizado de Zonas Deforestadas", fontsize=16)
     ax.set_xlabel("Longitud")
     ax.set_ylabel("Latitud")
     st.pyplot(fig)
@@ -134,3 +157,30 @@ st.subheader("Por precipitación")
 crear_mapa_deforestacion(
     gdf_datos_limpios, "Precipitacion", mapa_base, "Zonas Deforestadas por Precipitación"
 )
+
+# Mapas personalizados
+st.header("Mapa Personalizado de Zonas Deforestadas")
+
+columnas = gdf_datos_limpios.columns.tolist()
+filtros = {}
+
+st.write("Selecciona hasta 4 variables para filtrar el mapa:")
+for i in range(1, 5):
+    columna = st.selectbox(f"Variable {i}", [None] + columnas, key=f"var_{i}")
+    if columna:
+        if gdf_datos_limpios[columna].dtype == "O":
+            categorias = st.multiselect(f"Categorías para {columna}", gdf_datos_limpios[columna].unique(), key=f"cat_{i}")
+            if categorias:
+                filtros[columna] = categorias
+        else:
+            minimo, maximo = st.slider(
+                f"Rango para {columna}",
+                float(gdf_datos_limpios[columna].min()),
+                float(gdf_datos_limpios[columna].max()),
+                (float(gdf_datos_limpios[columna].min()), float(gdf_datos_limpios[columna].max())),
+                key=f"rng_{i}"
+            )
+            filtros[columna] = (minimo, maximo)
+
+if st.button("Generar Mapa Personalizado"):
+    crear_mapa_personalizado(gdf_datos_limpios, mapa_base, filtros)
