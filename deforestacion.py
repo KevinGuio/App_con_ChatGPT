@@ -81,7 +81,7 @@ def cargar_mapa_sudamerica(url_geopackage):
     mapa_base = gpd.read_file(url_geopackage)
     
     # Filtramos solo Sudamérica por su nombre en el campo 'name' (verifica que este campo exista en tu archivo)
-    sudamerica = mapa_base[mapa_base['continent'] == 'South America']
+    sudamerica = mapa_base[mapa_base["CONTINENT"] == "South America"]
     
     return sudamerica
 
