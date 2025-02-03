@@ -181,16 +181,31 @@ def realizar_analisis_clusters(gdf):
     Returns:
         None
     """
+    # Asegurarse de que las columnas necesarias no tengan valores nulos
     datos_clustering = gdf[["Latitud", "Longitud", "Superficie_Deforestada"]].dropna()
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    gdf["Cluster"] = kmeans.fit_predict(datos_clustering)
 
+    if datos_clustering.shape[0] == 0:
+        st.warning("No hay suficientes datos no nulos para realizar el análisis de clústeres.")
+        return
+
+    # Aplicar KMeans
+    kmeans = KMeans(n_clusters=3, random_state=42)
+    clusters = kmeans.fit_predict(datos_clustering)
+
+    # Asegurarse de que el índice de `gdf` y `datos_clustering` coincidan
+    gdf = gdf.loc[datos_clustering.index].copy()  # Alineamos el índice
+
+    # Asignar la columna "Cluster" a `gdf`
+    gdf["Cluster"] = clusters
+
+    # Visualizar los resultados del clustering
     fig, ax = plt.subplots(figsize=(12, 8))
     gdf.plot(ax=ax, column="Cluster", legend=True, cmap="viridis", markersize=10)
     ax.set_title("Análisis de Clústeres de Superficies Deforestadas")
     ax.set_xlabel("Longitud")
     ax.set_ylabel("Latitud")
     st.pyplot(fig)
+
 
 # URL base del mapa mundial
 url_mapa_base = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
