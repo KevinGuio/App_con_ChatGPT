@@ -77,6 +77,8 @@ def cargar_mapa_base(url_geopackage):
         gpd.GeoDataFrame: GeoDataFrame con el mapa base.
     """
     mapa_base = gpd.read_file(url_geopackage)
+    # Filtramos solo Sudamérica por su nombre en el campo 'name' (verifica que este campo exista en tu archivo)
+    mapa_base = mapa_base[mapa_base['CONTINENT'] == 'South America']
     return mapa_base
 
 def analizar_datos_deforestacion(gdf):
