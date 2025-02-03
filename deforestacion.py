@@ -81,9 +81,13 @@ def crear_mapa_deforestacion(gdf, columna, mapa_base, titulo):
     Returns:
         None
     """
+    # Filtrar el mapa base y los datos para Sudamérica
+    mapa_base_sa = mapa_base[mapa_base["CONTINENT"] == "South America"]
+    gdf_sa = gdf.cx[-81:-34, -56:13]  # Coordenadas aproximadas de Sudamérica
+
     fig, ax = plt.subplots(figsize=(12, 8))
-    mapa_base.plot(ax=ax, color="lightgrey", edgecolor="black")
-    gdf.plot(ax=ax, column=columna, legend=True, markersize=10, cmap="viridis")
+    mapa_base_sa.plot(ax=ax, color="lightgrey", edgecolor="black")
+    gdf_sa.plot(ax=ax, column=columna, legend=True, markersize=10, cmap="viridis")
     ax.set_title(titulo, fontsize=16)
     ax.set_xlabel("Longitud")
     ax.set_ylabel("Latitud")
