@@ -81,7 +81,7 @@ with col1:
 with col2:
     st.image(heart_image, width=100)
 with col3:
-    st.image(flower_image2, width=100)
+    st.image(flower_image, width=100)
 
 # Estado de la sesión para controlar el crecimiento del botón "Sí" y la visibilidad de los botones
 if 'button_grow' not in st.session_state:
