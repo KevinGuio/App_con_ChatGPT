@@ -46,7 +46,7 @@ st.markdown(
 )
 
 # Título de la aplicación
-st.markdown('<h1 class="title">¿Puedo ser tu Valentín? ❤️</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="title">¿Puedo ser tu Valentín?</h1>', unsafe_allow_html=True)
 
 # Imágenes de corazones y flores
 heart_image = Image.open("heart.png")  # Asegúrate de tener una imagen de corazón en el mismo directorio
@@ -70,7 +70,6 @@ with col1:
         st.image(heart_image, width=200)
 with col2:
     if st.button("No 😢"):
-        st.error("¡Oh no! 😢 Pero no te preocupes, seguiré intentándolo.")
         st.image(flower_image, width=200)
         st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
 
