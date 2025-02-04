@@ -93,7 +93,24 @@ if 'buttons_visible' not in st.session_state:
 if st.session_state.buttons_visible:
     st.markdown('<div class="center">', unsafe_allow_html=True)
 
-    # Botón "Sí"
+    # Botón "No"
+    if st.button("No 😢", key="no_button"):
+        st.session_state.button_grow += 1  # Incrementa el tamaño del botón "Sí"
+        if st.session_state.button_grow > 5:  # Límite para que no crezca indefinidamente
+            st.session_state.button_grow = 5
+
+    # Botón "Sí" con tamaño dinámico
+    button_style = f"""
+    <style>
+    div.stButton > button:first-child {{
+        width: {st.session_state.button_grow * 20}%;
+        font-size: {st.session_state.button_grow * 10}px !important;
+        padding: {st.session_state.button_grow * 5}px {st.session_state.button_grow * 10}px !important;
+    }}
+    </style>
+    """
+    st.markdown(button_style, unsafe_allow_html=True)
+
     if st.button("¡Sí! ❤️", key="yes_button"):
         st.session_state.buttons_visible = False  # Oculta los botones
         st.balloons()
@@ -112,28 +129,7 @@ if st.session_state.buttons_visible:
             unsafe_allow_html=True,
         )
 
-    # Botón "No"
-    if st.button("No 😢", key="no_button"):
-        st.session_state.button_grow += 1  # Incrementa el tamaño del botón "Sí"
-        if st.session_state.button_grow > 5:  # Límite para que no crezca indefinidamente
-            st.session_state.button_grow = 5
-
-    # Aplicar el efecto de crecimiento solo al botón "Sí"
-    if st.session_state.button_grow > 1:
-        st.markdown(
-            f"""
-            <style>
-            div.stButton > button[key="yes_button"] {{
-                width: {st.session_state.button_grow * 20}%;
-                font-size: {st.session_state.button_grow * 10}px !important;
-                padding: {st.session_state.button_grow * 5}px {st.session_state.button_grow * 10}px !important;
-            }}
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
-
+    st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Mostrar más imágenes después de presionar "Sí"
