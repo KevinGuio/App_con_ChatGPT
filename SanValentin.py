@@ -1,6 +1,5 @@
 import streamlit as st
 from PIL import Image
-import random
 
 # Configuración de la página
 st.set_page_config(
@@ -40,6 +39,23 @@ st.markdown(
     .heart {
         color: #ff4b4b;
     }
+    .center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+    .big-button {
+        width: 100%;
+        font-size: 30px !important;
+        padding: 20px 40px !important;
+    }
+    .invitation {
+        font-size: 25px;
+        text-align: center;
+        margin-top: 20px;
+        color: #ff4b4b;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -61,17 +77,48 @@ with col2:
 with col3:
     st.image(flower_image, width=100)
 
+# Estado de la sesión para controlar el botón "Sí"
+if 'button_clicked' not in st.session_state:
+    st.session_state.button_clicked = False
+
 # Botones de respuesta
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("¡Sí! ❤️"):
-        st.balloons()
-        st.success("¡Eres la mejor! ¡Feliz San Valentín! ❤️")
-        st.image(heart_image, width=200)
-with col2:
-    if st.button("No 😢"):
-        st.image(flower_image, width=200)
-        st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
+st.markdown('<div class="center">', unsafe_allow_html=True)
+
+if st.button("¡Sí! ❤️"):
+    st.session_state.button_clicked = True
+    st.balloons()
+    st.success("Sabía que lo harías, eres la mejor ❤️")
+    st.markdown(
+        """
+        <div class="invitation">
+            <h2>¡Te invito a una cita!</h2>
+            <p>¿Qué tal si celebramos este día especial juntos?</p>
+            <p>📅 Fecha: 14 de febrero</p>
+            <p>⏰ Hora: 6:00 PM</p>
+            <p>📍 Lugar: [Nombre del lugar]</p>
+            <p>¡Espero que puedas acompañarme!</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+if st.button("No 😢"):
+    st.session_state.button_clicked = True
+    st.markdown(
+        """
+        <style>
+        .stButton>button {
+            width: 100%;
+            font-size: 30px !important;
+            padding: 20px 40px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Efecto de confeti al cargar la página
 if 'confetti' not in st.session_state:
