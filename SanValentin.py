@@ -95,7 +95,7 @@ if st.button("¡Sí! ❤️"):
             <p>¿Qué tal si celebramos este día especial juntos?</p>
             <p>📅 Fecha: 14 de febrero</p>
             <p>⏰ Hora: 6:00 PM</p>
-            <p>📍 Lugar: [Nombre del lugar]</p>
+            <p>📍 Lugar: Videollamada</p>
             <p>¡Espero que puedas acompañarme!</p>
         </div>
         """,
