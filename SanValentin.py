@@ -94,7 +94,7 @@ if st.session_state.buttons_visible:
     st.markdown('<div class="center">', unsafe_allow_html=True)
 
     # Botón "Sí"
-    if st.button("¡Sí! ❤️"):
+    if st.button("¡Sí! ❤️", key="yes_button"):
         st.session_state.buttons_visible = False  # Oculta los botones
         st.balloons()
         st.success("Sabía que lo harías, eres la mejor ❤️")
@@ -113,7 +113,7 @@ if st.session_state.buttons_visible:
         )
 
     # Botón "No"
-    if st.button("No 😢"):
+    if st.button("No 😢", key="no_button"):
         st.session_state.button_grow += 1  # Incrementa el tamaño del botón "Sí"
         if st.session_state.button_grow > 5:  # Límite para que no crezca indefinidamente
             st.session_state.button_grow = 5
@@ -123,7 +123,7 @@ if st.session_state.buttons_visible:
         st.markdown(
             f"""
             <style>
-            div.stButton > button:first-child {{
+            div.stButton > button[key="yes_button"] {{
                 width: {st.session_state.button_grow * 20}%;
                 font-size: {st.session_state.button_grow * 10}px !important;
                 padding: {st.session_state.button_grow * 5}px {st.session_state.button_grow * 10}px !important;
