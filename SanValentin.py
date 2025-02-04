@@ -85,7 +85,7 @@ with col3:
 
 # Estado de la sesión para controlar el crecimiento del botón "Sí" y la visibilidad de los botones
 if 'button_grow' not in st.session_state:
-    st.session_state.button_grow = False
+    st.session_state.button_grow = 1  # Inicia con un tamaño normal
 if 'buttons_visible' not in st.session_state:
     st.session_state.buttons_visible = True
 
@@ -95,7 +95,6 @@ if st.session_state.buttons_visible:
 
     # Botón "Sí"
     if st.button("¡Sí! ❤️"):
-        st.session_state.button_grow = False
         st.session_state.buttons_visible = False  # Oculta los botones
         st.balloons()
         st.success("Sabía que lo harías, eres la mejor ❤️")
@@ -106,7 +105,7 @@ if st.session_state.buttons_visible:
                 <p>¿Qué tal si celebramos este día especial juntos?</p>
                 <p>📅 Fecha: 14 de febrero</p>
                 <p>⏰ Hora: 6:00 PM</p>
-                <p>📍 Lugar: [Nombre del lugar]</p>
+                <p>📍 Lugar: Videollamada</p>
                 <p>¡Espero que puedas acompañarme!</p>
             </div>
             """,
@@ -115,18 +114,20 @@ if st.session_state.buttons_visible:
 
     # Botón "No"
     if st.button("No 😢"):
-        st.session_state.button_grow = True  # Activa el crecimiento del botón "Sí"
+        st.session_state.button_grow += 1  # Incrementa el tamaño del botón "Sí"
+        if st.session_state.button_grow > 5:  # Límite para que no crezca indefinidamente
+            st.session_state.button_grow = 5
 
     # Aplicar el efecto de crecimiento al botón "Sí"
-    if st.session_state.button_grow:
+    if st.session_state.button_grow > 1:
         st.markdown(
-            """
+            f"""
             <style>
-            .stButton>button {
-                width: 100%;
-                font-size: 30px !important;
-                padding: 20px 40px !important;
-            }
+            .stButton>button {{
+                width: {st.session_state.button_grow * 20}%;
+                font-size: {st.session_state.button_grow * 10}px !important;
+                padding: {st.session_state.button_grow * 5}px {st.session_state.button_grow * 10}px !important;
+            }}
             </style>
             """,
             unsafe_allow_html=True,
@@ -147,9 +148,9 @@ if not st.session_state.buttons_visible:
         st.image(heart_image, width=150)
 
 # Efecto de confeti al cargar la página
-if 'confetti' not in st.session_state:
-    st.session_state.confetti = True
-    st.balloons()
+# if 'confetti' not in st.session_state:
+#     st.session_state.confetti = True
+#     st.balloons()
 
 # Pie de página
 st.markdown(
