@@ -83,11 +83,20 @@ with col2:
 with col3:
     st.image(flower_image, width=100)
 
-# Estado de la sesión para controlar el crecimiento del botón "Sí" y la visibilidad de los botones
-if 'button_grow' not in st.session_state:
-    st.session_state.button_grow = 1  # Inicia con un tamaño normal
+# Estado de la sesión para controlar la visibilidad de los botones y mensajes
+if 'no_clicks' not in st.session_state:
+    st.session_state.no_clicks = 0  # Contador de clics en "No"
 if 'buttons_visible' not in st.session_state:
     st.session_state.buttons_visible = True
+
+# Mensajes alternativos al presionar "No"
+no_messages = [
+    "¿Estás segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉",
+    "¡Vamos! No seas tímida, acepta el 'Sí' ❤️",
+    "Recuerda que mi corazón está en tus manos 💖",
+    "¡Anímate! Seré el mejor Valentín de todos 🌹",
+    "¿Todavía no? ¡Estoy esperando con ansias tu 'Sí'! 💌",
+]
 
 # Botones de respuesta
 if st.session_state.buttons_visible:
@@ -95,18 +104,17 @@ if st.session_state.buttons_visible:
 
     # Botón "No"
     if st.button("No 😢", key="no_button"):
-        st.session_state.button_grow += 1  # Incrementa el tamaño del botón "Sí"
-        if st.session_state.button_grow > 5:  # Límite para que no crezca indefinidamente
-            st.session_state.button_grow = 5
+        st.session_state.no_clicks += 1
+        st.warning(no_messages[st.session_state.no_clicks % len(no_messages)])
 
-    # Botón "Sí" con tamaño dinámico
-    button_style = f"""
+    # Botón "Sí" con tamaño fijo
+    button_style = """
     <style>
-    div.stButton > button:first-child {{
-        width: {st.session_state.button_grow * 20}%;
-        font-size: {st.session_state.button_grow * 10}px !important;
-        padding: {st.session_state.button_grow * 5}px {st.session_state.button_grow * 10}px !important;
-    }}
+    div.stButton > button:first-child {
+        width: 100%;
+        font-size: 50px !important;
+        padding: 25px 50px !important;
+    }
     </style>
     """
     st.markdown(button_style, unsafe_allow_html=True)
@@ -129,7 +137,6 @@ if st.session_state.buttons_visible:
             unsafe_allow_html=True,
         )
 
-    st.write("¿Segura? ¡Dale otra oportunidad al botón de 'Sí'! 😉")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Mostrar más imágenes después de presionar "Sí"
