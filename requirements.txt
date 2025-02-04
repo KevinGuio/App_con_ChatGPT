@@ -5,3 +5,4 @@ pygame
 geopandas
 scikit-learn
 numpy
+Pillow
