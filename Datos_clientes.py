@@ -8,7 +8,7 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 
 # URL fija del GeoPackage (reemplaza por la URL deseada)
-URL_GEOPACKAGE = "https://ruta/a/tu/archivo_mapa_base.gpkg"
+URL_GEOPACKAGE = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
 
 @st.cache_data
 def load_data(source_type, file=None, url=None):
