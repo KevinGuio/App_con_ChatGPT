@@ -109,24 +109,29 @@ def fill_missing_values(df):
 
 def cargar_mapa_base(url_geopackage):
     """
-    Carga un mapa base mundial desde un GeoPackage y filtra para mostrar solo Sudamérica.
+    Carga un mapa base mundial desde un GeoPackage y filtra para mostrar solo Centro y Suramérica.
 
     Args:
         url_geopackage (str): URL del GeoPackage con los datos de mapa base.
 
     Returns:
-        gpd.GeoDataFrame: GeoDataFrame con el mapa base filtrado a Sudamérica, o None si ocurre un error.
+        gpd.GeoDataFrame: GeoDataFrame con el mapa base filtrado a Centro y Suramérica, o None si ocurre un error.
     """
     try:
         mapa_base = gpd.read_file(url_geopackage)
-        # Filtrar para que se muestre únicamente el continente 'South America'
-        mapa_base = mapa_base[mapa_base["CONTINENT"] == "South America"]
+        # Filtrar para incluir países cuyo continente sea "South America" 
+        # o cuyo subregión sea "Central America".
+        mapa_base = mapa_base[
+            (mapa_base["CONTINENT"] == "South America") |
+            (mapa_base["SUBREGION"] == "Central America")
+        ]
         return mapa_base
     except URLError as e:
         st.error(f"Error al cargar el mapa base (URLError): {e}")
     except Exception as e:
         st.error(f"Error al cargar el mapa base: {e}")
     return None
+
 
 
 def snap_to_land(point, land_gdf):
