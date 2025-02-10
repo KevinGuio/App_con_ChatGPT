@@ -6,8 +6,9 @@ import pydeck as pdk
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
+from urllib.error import URLError
 
-# URL fija del GeoPackage (reemplaza por la URL deseada)
+# URL fija del GeoPackage (Natural Earth) que contiene los países
 URL_GEOPACKAGE = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
 
 @st.cache_data
@@ -102,16 +103,24 @@ def fill_missing_values(df):
 
 def cargar_mapa_base(url_geopackage):
     """
-    Carga un mapa base mundial desde un GeoPackage.
+    Carga un mapa base mundial desde un GeoPackage y filtra para mostrar solo Sudamérica.
 
     Args:
         url_geopackage (str): URL del GeoPackage con los datos de mapa base.
 
     Returns:
-        gpd.GeoDataFrame: GeoDataFrame con el mapa base.
+        gpd.GeoDataFrame: GeoDataFrame con el mapa base filtrado a Sudamérica, o None si ocurre un error.
     """
-    mapa_base = gpd.read_file(url_geopackage)
-    return mapa_base
+    try:
+        mapa_base = gpd.read_file(url_geopackage)
+        # Filtrar para que se muestre únicamente el continente 'South America'
+        mapa_base = mapa_base[mapa_base['CONTINENT'] == 'South America']
+        return mapa_base
+    except URLError as e:
+        st.error(f"Error al cargar el mapa base (URLError): {e}")
+    except Exception as e:
+        st.error(f"Error al cargar el mapa base: {e}")
+    return None
 
 def plot_on_basemap(df_points, title="Mapa de Clientes"):
     """Plot client locations on a base map loaded from a GeoPackage.
@@ -121,6 +130,9 @@ def plot_on_basemap(df_points, title="Mapa de Clientes"):
         title (str, optional): Título del gráfico.
     """
     base_map = cargar_mapa_base(URL_GEOPACKAGE)
+    if base_map is None:
+        st.error("No se pudo cargar el mapa base. Verifica la URL o la conexión.")
+        return
     # Convertir los datos de clientes a GeoDataFrame
     gdf_points = gpd.GeoDataFrame(
         df_points,
@@ -132,22 +144,6 @@ def plot_on_basemap(df_points, title="Mapa de Clientes"):
     gdf_points.plot(ax=ax, color="red", markersize=50)
     ax.set_title(title)
     st.pyplot(fig)
-
-def analyze_correlation(df):
-    """Analyze correlation between Edad and Ingreso_Anual_USD.
-
-    Computes global correlation, and correlations segmented by Género and Frecuencia_Compra.
-
-    Args:
-        df (pd.DataFrame): DataFrame with filled data.
-
-    Returns:
-        dict: Dictionary with correlation results.
-    """
-    global_corr = df['Edad'].corr(df['Ingreso_Anual_USD'])
-    by_gender = df.groupby('Género').apply(lambda x: x['Edad'].corr(x['Ingreso_Anual_USD']))
-    by_frequency = df.groupby('Frecuencia_Compra').apply(lambda x: x['Edad'].corr(x['Ingreso_Anual_USD']))
-    return {'global': global_corr, 'by_gender': by_gender, 'by_frequency': by_frequency}
 
 def plot_correlation_segmented(df):
     """Plot correlation between Edad and Ingreso_Anual_USD segmented by Género and Frecuencia_Compra.
@@ -175,6 +171,22 @@ def plot_correlation_segmented(df):
         y=1.05
     )
     st.pyplot(g.fig)
+
+def analyze_correlation(df):
+    """Analyze correlation between Edad and Ingreso_Anual_USD.
+
+    Computes global correlation, and correlations segmented by Género and Frecuencia_Compra.
+
+    Args:
+        df (pd.DataFrame): DataFrame with filled data.
+
+    Returns:
+        dict: Dictionary with correlation results.
+    """
+    global_corr = df['Edad'].corr(df['Ingreso_Anual_USD'])
+    by_gender = df.groupby('Género').apply(lambda x: x['Edad'].corr(x['Ingreso_Anual_USD']))
+    by_frequency = df.groupby('Frecuencia_Compra').apply(lambda x: x['Edad'].corr(x['Ingreso_Anual_USD']))
+    return {'global': global_corr, 'by_gender': by_gender, 'by_frequency': by_frequency}
 
 def map_global(df):
     """Display a global map of client locations using a base map from a GeoPackage.
