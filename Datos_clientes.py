@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 
+
 @st.cache_data
 def load_data(source_type, file=None, url=None):
     """Load data from a file or URL.
@@ -22,9 +23,14 @@ def load_data(source_type, file=None, url=None):
     else:
         raise ValueError("Invalid source type or missing input.")
 
+
 @st.cache_data
 def fill_missing_values(df):
-    """Fill missing values in the DataFrame based on logical rules.
+    """Fill missing values in the DataFrame using binning for improved grouping.
+
+    The method creates temporary bins (cuartiles) for the numeric columns used in
+    the grouping keys (Ingreso_Anual_USD, Historial_Compras, Frecuencia_Compra y Edad)
+    para poder agrupar de forma más eficiente y rellenar los valores faltantes.
 
     Args:
         df (pd.DataFrame): Input DataFrame with missing values.
@@ -34,46 +40,87 @@ def fill_missing_values(df):
     """
     df_filled = df.copy()
 
-    # Fill missing 'Nombre' with 'N/A'
+    # Rellenar 'Nombre' y 'Género' con valores fijos
     df_filled['Nombre'] = df_filled['Nombre'].fillna('N/A')
-
-    # Fill missing 'Género' with 'No binario'
     df_filled['Género'] = df_filled['Género'].fillna('No binario')
 
-    # Fill missing 'Edad' using median grouped by other columns
+    # Crear bins para columnas numéricas utilizadas en la agrupación
+    df_filled['Ingreso_bin'] = pd.qcut(
+        df_filled['Ingreso_Anual_USD'], q=4, duplicates='drop'
+    )
+    df_filled['Historial_bin'] = pd.qcut(
+        df_filled['Historial_Compras'], q=4, duplicates='drop'
+    )
+    df_filled['Frecuencia_bin'] = pd.qcut(
+        df_filled['Frecuencia_Compra'], q=4, duplicates='drop'
+    )
+
+    # Rellenar 'Edad' utilizando agrupación por Género y los bins de Ingreso, Historial y Frecuencia
     df_filled['Edad'] = df_filled['Edad'].fillna(
-        df.groupby(['Género', 'Frecuencia_Compra', 'Ingreso_Anual_USD'])['Edad'].transform('median')
+        df_filled.groupby(
+            ['Género', 'Ingreso_bin', 'Historial_bin', 'Frecuencia_bin']
+        )['Edad'].transform('median')
     )
 
-    # Fill missing 'Ingreso_Anual_USD' using median grouped by other columns
+    # Una vez rellenada la Edad, se genera un bin para ésta
+    df_filled['Edad_bin'] = pd.qcut(
+        df_filled['Edad'], q=4, duplicates='drop'
+    )
+
+    # Rellenar 'Ingreso_Anual_USD' agrupando por Edad_bin, Género, Historial_bin y Frecuencia_bin
     df_filled['Ingreso_Anual_USD'] = df_filled['Ingreso_Anual_USD'].fillna(
-        df.groupby(['Edad', 'Género', 'Frecuencia_Compra'])['Ingreso_Anual_USD'].transform('median')
+        df_filled.groupby(
+            ['Edad_bin', 'Género', 'Historial_bin', 'Frecuencia_bin']
+        )['Ingreso_Anual_USD'].transform('median')
     )
 
-    # Fill missing 'Historial_Compras' using median grouped by other columns
+    # Rellenar 'Historial_Compras' agrupando por Edad_bin, Género, Ingreso_bin y Frecuencia_bin
     df_filled['Historial_Compras'] = df_filled['Historial_Compras'].fillna(
-        df.groupby(['Edad', 'Género', 'Frecuencia_Compra'])['Historial_Compras'].transform('median')
+        df_filled.groupby(
+            ['Edad_bin', 'Género', 'Ingreso_bin', 'Frecuencia_bin']
+        )['Historial_Compras'].transform('median')
     )
 
-    # Fill missing 'Frecuencia_Compra' with the mode
+    # Rellenar 'Frecuencia_Compra' agrupando por Edad_bin, Género, Ingreso_bin y Historial_bin
     df_filled['Frecuencia_Compra'] = df_filled['Frecuencia_Compra'].fillna(
-        df['Frecuencia_Compra'].mode()[0]
+        df_filled.groupby(
+            ['Edad_bin', 'Género', 'Ingreso_bin', 'Historial_bin']
+        )['Frecuencia_Compra'].transform(lambda x: x.mode().iloc[0])
     )
 
-    # Fill missing 'Latitud' and 'Longitud' using median grouped by other columns
+    # Rellenar 'Latitud' y 'Longitud' agrupando por Edad_bin, Género, Ingreso_bin, Historial_bin y Frecuencia_bin
     df_filled['Latitud'] = df_filled['Latitud'].fillna(
-        df.groupby(['Edad', 'Género', 'Ingreso_Anual_USD'])['Latitud'].transform('median')
+        df_filled.groupby(
+            ['Edad_bin', 'Género', 'Ingreso_bin', 'Historial_bin', 'Frecuencia_bin']
+        )['Latitud'].transform('median')
     )
     df_filled['Longitud'] = df_filled['Longitud'].fillna(
-        df.groupby(['Edad', 'Género', 'Ingreso_Anual_USD'])['Longitud'].transform('median')
+        df_filled.groupby(
+            ['Edad_bin', 'Género', 'Ingreso_bin', 'Historial_bin', 'Frecuencia_bin']
+        )['Longitud'].transform('median')
     )
 
+    # Eliminar columnas temporales de bins
+    df_filled = df_filled.drop(
+        columns=['Ingreso_bin', 'Historial_bin', 'Frecuencia_bin', 'Edad_bin']
+    )
+
+    # Paso global de respaldo para cualquier valor faltante restante
+    df_filled = df_filled.fillna({
+        'Edad': df['Edad'].median(),
+        'Ingreso_Anual_USD': df['Ingreso_Anual_USD'].median(),
+        'Historial_Compras': df['Historial_Compras'].median(),
+        'Latitud': df['Latitud'].median(),
+        'Longitud': df['Longitud'].median()
+    })
+
     return df_filled
+
 
 def main():
     st.title("Análisis de Datos de Clientes")
 
-    # File or URL upload
+    # Carga de datos desde archivo o URL
     st.sidebar.header("Carga de datos")
     source_type = st.sidebar.radio("Seleccione la fuente de datos:", ("Archivo", "URL"))
 
@@ -90,11 +137,12 @@ def main():
         st.subheader("Datos originales")
         st.dataframe(df)
 
-        # Fill missing values
+        # Rellenar valores faltantes usando la técnica de binning
         df_filled = fill_missing_values(df)
 
         st.subheader("Datos con valores faltantes rellenados")
         st.dataframe(df_filled)
+
 
 if __name__ == "__main__":
     main()
