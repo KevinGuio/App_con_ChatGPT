@@ -4,7 +4,11 @@ import numpy as np
 import geopandas as gpd
 import pydeck as pdk
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.cluster import KMeans
+
+# URL fija del GeoPackage (reemplaza por la URL deseada)
+URL_GEOPACKAGE = "https://ruta/a/tu/archivo_mapa_base.gpkg"
 
 @st.cache_data
 def load_data(source_type, file=None, url=None):
@@ -109,15 +113,14 @@ def cargar_mapa_base(url_geopackage):
     mapa_base = gpd.read_file(url_geopackage)
     return mapa_base
 
-def plot_on_basemap(df_points, url_geopackage, title="Mapa de Clientes"):
+def plot_on_basemap(df_points, title="Mapa de Clientes"):
     """Plot client locations on a base map loaded from a GeoPackage.
 
     Args:
         df_points (pd.DataFrame): DataFrame with columns 'Latitud' y 'Longitud'.
-        url_geopackage (str): URL del GeoPackage con el mapa base.
         title (str, optional): Título del gráfico.
     """
-    base_map = cargar_mapa_base(url_geopackage)
+    base_map = cargar_mapa_base(URL_GEOPACKAGE)
     # Convertir los datos de clientes a GeoDataFrame
     gdf_points = gpd.GeoDataFrame(
         df_points,
@@ -146,6 +149,33 @@ def analyze_correlation(df):
     by_frequency = df.groupby('Frecuencia_Compra').apply(lambda x: x['Edad'].corr(x['Ingreso_Anual_USD']))
     return {'global': global_corr, 'by_gender': by_gender, 'by_frequency': by_frequency}
 
+def plot_correlation_segmented(df):
+    """Plot correlation between Edad and Ingreso_Anual_USD segmented by Género and Frecuencia_Compra.
+
+    This function uses seaborn's lmplot to create a facet grid where each panel corresponds
+    to a value of Frecuencia_Compra, and within each panel points are colored by Género.
+
+    Args:
+        df (pd.DataFrame): DataFrame with filled data.
+    """
+    g = sns.lmplot(
+        data=df,
+        x="Edad",
+        y="Ingreso_Anual_USD",
+        hue="Género",
+        col="Frecuencia_Compra",
+        aspect=1.2,
+        height=4,
+        markers="o",
+        scatter_kws={'s': 50, 'alpha': 0.7},
+        ci=None
+    )
+    g.fig.suptitle(
+        "Correlación entre Edad e Ingreso Anual segmentado por Género y Frecuencia de Compra",
+        y=1.05
+    )
+    st.pyplot(g.fig)
+
 def map_global(df):
     """Display a global map of client locations using a base map from a GeoPackage.
 
@@ -153,11 +183,7 @@ def map_global(df):
         df (pd.DataFrame): DataFrame with filled data.
     """
     st.subheader("Mapa Global de Clientes")
-    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
-    if url_geo:
-        plot_on_basemap(df, url_geo, title="Clientes Globales")
-    else:
-        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
+    plot_on_basemap(df, title="Clientes Globales")
 
 def map_by_gender(df):
     """Display a map of client locations filtered by Género using the base map.
@@ -168,11 +194,7 @@ def map_by_gender(df):
     gender = st.selectbox("Seleccione Género", df['Género'].unique())
     filtered = df[df['Género'] == gender]
     st.subheader(f"Mapa de Clientes - Género: {gender}")
-    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
-    if url_geo:
-        plot_on_basemap(filtered, url_geo, title=f"Clientes - Género: {gender}")
-    else:
-        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
+    plot_on_basemap(filtered, title=f"Clientes - Género: {gender}")
 
 def map_by_frequency(df):
     """Display a map of client locations filtered by Frecuencia de Compra using the base map.
@@ -183,11 +205,7 @@ def map_by_frequency(df):
     freq = st.selectbox("Seleccione Frecuencia de Compra", df['Frecuencia_Compra'].unique())
     filtered = df[df['Frecuencia_Compra'] == freq]
     st.subheader(f"Mapa de Clientes - Frecuencia de Compra: {freq}")
-    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
-    if url_geo:
-        plot_on_basemap(filtered, url_geo, title=f"Clientes - Frecuencia: {freq}")
-    else:
-        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
+    plot_on_basemap(filtered, title=f"Clientes - Frecuencia: {freq}")
 
 def custom_map(df):
     """Display a custom map based on user-selected variable ranges using the base map.
@@ -205,16 +223,16 @@ def custom_map(df):
         for col in selected:
             col_min = float(df[col].min())
             col_max = float(df[col].max())
-            range_val = st.slider(f"Rango para {col}", min_value=col_min, max_value=col_max,
-                                    value=(col_min, col_max))
+            range_val = st.slider(
+                f"Rango para {col}",
+                min_value=col_min,
+                max_value=col_max,
+                value=(col_min, col_max)
+            )
             filters &= df[col].between(range_val[0], range_val[1])
     filtered = df[filters]
-    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
-    if url_geo:
-        plot_on_basemap(filtered, url_geo, title="Mapa Personalizado")
-        st.dataframe(filtered)
-    else:
-        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
+    plot_on_basemap(filtered, title="Mapa Personalizado")
+    st.dataframe(filtered)
 
 def cluster_analysis(df):
     """Perform clustering analysis based on Frecuencia_Compra.
@@ -346,12 +364,12 @@ def main():
 
         if funcionalidad == "Análisis de Correlación":
             corr = analyze_correlation(df_filled)
-            st.subheader("Correlación entre Edad e Ingreso Anual (Global)")
-            st.write(corr['global'])
-            st.subheader("Correlación por Género")
-            st.dataframe(corr['by_gender'])
-            st.subheader("Correlación por Frecuencia de Compra")
-            st.dataframe(corr['by_frequency'])
+            st.subheader("Correlaciones numéricas")
+            st.write("Global:", corr['global'])
+            st.write("Por Género:", corr['by_gender'])
+            st.write("Por Frecuencia de Compra:", corr['by_frequency'])
+            st.subheader("Gráfica de Correlación Segmentada")
+            plot_correlation_segmented(df_filled)
         elif funcionalidad == "Mapa Global":
             map_global(df_filled)
         elif funcionalidad == "Mapa por Género":
