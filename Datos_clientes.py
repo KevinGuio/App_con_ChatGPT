@@ -12,7 +12,8 @@ from shapely.ops import nearest_points
 
 # URL fija del GeoPackage (Natural Earth) que contiene los países
 # Se filtrará para mostrar solo Sudamérica en la función cargar_mapa_base.
-URL_GEOPACKAGE = "https://naturalearth.s3.amazonaws.com/50m_cultural/ne_50m_admin_0_countries.zip"
+URL_GEOPACKAGE = "https://naturalearth.s3.amazonaws.com/\
+50m_cultural/ne_50m_admin_0_countries.zip"
 
 
 @st.cache_data
@@ -20,7 +21,8 @@ def load_data(source_type, file=None, url=None):
     """Carga datos desde un archivo o URL.
 
     Args:
-        source_type (str): 'file' para carga por archivo o 'url' para carga desde URL.
+        source_type (str): 'file' para carga por archivo o 'url' para carga
+        desde URL.
         file (UploadedFile, optional): Archivo subido por el usuario.
         url (str, optional): URL proporcionada por el usuario.
 
@@ -37,10 +39,11 @@ def load_data(source_type, file=None, url=None):
 
 @st.cache_data
 def fill_missing_values(df):
-    """Rellena los valores faltantes del DataFrame usando binning para agrupación.
+    """Rellena los valores faltantes del DataFrame usando binning para
+    agrupación.
 
-    Se crean bins para las columnas numéricas usadas como llaves de agrupación y
-    se aplica agregación grupal para rellenar los valores faltantes.
+    Se crean bins para las columnas numéricas usadas como llaves de agrupación
+    y se aplica agregación grupal para rellenar los valores faltantes.
 
     Args:
         df (pd.DataFrame): DataFrame de entrada con valores faltantes.
@@ -55,11 +58,14 @@ def fill_missing_values(df):
     df_filled["Género"] = df_filled["Género"].fillna("No binario")
 
     # Crear bins para columnas numéricas
-    df_filled["Ingreso_bin"] = pd.qcut(df_filled["Ingreso_Anual_USD"], q=4, duplicates="drop")
-    df_filled["Historial_bin"] = pd.qcut(df_filled["Historial_Compras"], q=4, duplicates="drop")
+    df_filled["Ingreso_bin"] = pd.qcut(df_filled["Ingreso_Anual_USD"],
+                                       q=4, duplicates="drop")
+    df_filled["Historial_bin"] = pd.qcut(df_filled["Historial_Compras"],
+                                         q=4, duplicates="drop")
     df_filled["Edad_bin"] = pd.qcut(df_filled["Edad"], q=4, duplicates="drop")
 
-    # Para 'Frecuencia_Compra': si es numérica se usa qcut; de lo contrario se convierte a códigos
+    # Para 'Frecuencia_Compra': si es numérica se usa qcut; de lo contrario
+    # se convierte a códigos
     df_filled["Frecuencia_bin"] = (
         pd.qcut(df_filled["Frecuencia_Compra"], q=4, duplicates="drop")
         if pd.api.types.is_numeric_dtype(df_filled["Frecuencia_Compra"])
@@ -68,32 +74,39 @@ def fill_missing_values(df):
 
     # Imputar valores faltantes usando agrupaciones
     df_filled["Edad"] = df_filled["Edad"].fillna(
-        df_filled.groupby(["Género", "Ingreso_bin", "Historial_bin", "Frecuencia_bin"])["Edad"]
+        df_filled.groupby(["Género", "Ingreso_bin", "Historial_bin",
+                           "Frecuencia_bin"])["Edad"]
         .transform("median")
     )
     df_filled["Ingreso_Anual_USD"] = df_filled["Ingreso_Anual_USD"].fillna(
-        df_filled.groupby(["Edad_bin", "Género", "Historial_bin", "Frecuencia_bin"])["Ingreso_Anual_USD"]
+        df_filled.groupby(["Edad_bin", "Género", "Historial_bin",
+                           "Frecuencia_bin"])["Ingreso_Anual_USD"]
         .transform("median")
     )
     df_filled["Historial_Compras"] = df_filled["Historial_Compras"].fillna(
-        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin", "Frecuencia_bin"])["Historial_Compras"]
+        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin",
+                           "Frecuencia_bin"])["Historial_Compras"]
         .transform("median")
     )
     df_filled["Frecuencia_Compra"] = df_filled["Frecuencia_Compra"].fillna(
-        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin", "Historial_bin"])["Frecuencia_Compra"]
+        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin",
+                           "Historial_bin"])["Frecuencia_Compra"]
         .transform(lambda x: x.mode().iloc[0] if not x.mode().empty else np.nan)
     )
     df_filled["Latitud"] = df_filled["Latitud"].fillna(
-        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin", "Historial_bin", "Frecuencia_bin"])["Latitud"]
+        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin",
+                           "Historial_bin", "Frecuencia_bin"])["Latitud"]
         .transform("median")
     )
     df_filled["Longitud"] = df_filled["Longitud"].fillna(
-        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin", "Historial_bin", "Frecuencia_bin"])["Longitud"]
+        df_filled.groupby(["Edad_bin", "Género", "Ingreso_bin",
+                           "Historial_bin", "Frecuencia_bin"])["Longitud"]
         .transform("median")
     )
 
     # Eliminar columnas temporales de bins
-    df_filled = df_filled.drop(columns=["Ingreso_bin", "Historial_bin", "Frecuencia_bin", "Edad_bin"])
+    df_filled = df_filled.drop(columns=["Ingreso_bin", "Historial_bin",
+                                        "Frecuencia_bin", "Edad_bin"])
 
     # Respaldo global para cualquier valor faltante restante
     df_filled = df_filled.fillna({
@@ -108,14 +121,15 @@ def fill_missing_values(df):
 
 
 def cargar_mapa_base(url_geopackage):
-    """
-    Carga un mapa base mundial desde un GeoPackage y filtra para mostrar solo Centro y Suramérica.
+    """Carga un mapa base mundial desde un GeoPackage y filtra para mostrar
+    solo Centro y Suramérica.
 
     Args:
         url_geopackage (str): URL del GeoPackage con los datos de mapa base.
 
     Returns:
-        gpd.GeoDataFrame: GeoDataFrame con el mapa base filtrado a Centro y Suramérica, o None si ocurre un error.
+        gpd.GeoDataFrame: GeoDataFrame con el mapa base filtrado a Centro y
+         Suramérica, o None si ocurre un error.
     """
     try:
         mapa_base = gpd.read_file(url_geopackage)
@@ -142,7 +156,8 @@ def snap_to_land(point, land_gdf):
 
     Args:
         point (shapely.geometry.Point): Punto a evaluar.
-        land_gdf (gpd.GeoDataFrame): GeoDataFrame con la geometría de la tierra.
+        land_gdf (gpd.GeoDataFrame): GeoDataFrame con la geometría de la
+         tierra.
 
     Returns:
         shapely.geometry.Point: Punto sobre tierra (original o corregido).
@@ -157,10 +172,12 @@ def snap_to_land(point, land_gdf):
 
 def corregir_coordenadas(df, land_gdf):
     """
-    Corrige las coordenadas que caen en el mar moviéndolas al punto de tierra más cercano.
+    Corrige las coordenadas que caen en el mar moviéndolas al punto de tierra
+    más cercano.
     
     Args:
-        df (pd.DataFrame): DataFrame que contiene las columnas 'Longitud' y 'Latitud'.
+        df (pd.DataFrame): DataFrame que contiene las columnas
+         'Longitud' y 'Latitud'.
         land_gdf (gpd.GeoDataFrame): GeoDataFrame con los polígonos de tierra.
 
     Returns:
@@ -179,20 +196,24 @@ def corregir_coordenadas(df, land_gdf):
 
 
 def plot_on_basemap(df_points, title="Mapa de Clientes"):
-    """Grafica las ubicaciones de los clientes sobre un mapa base cargado desde un GeoPackage.
+    """Grafica las ubicaciones de los clientes sobre un mapa base cargado
+    desde un GeoPackage.
 
     Args:
-        df_points (pd.DataFrame): DataFrame con las columnas 'Latitud' y 'Longitud'.
+        df_points (pd.DataFrame): DataFrame con las columnas
+         'Latitud' y 'Longitud'.
         title (str, optional): Título del gráfico.
     """
     base_map = cargar_mapa_base(URL_GEOPACKAGE)
     if base_map is None:
-        st.error("No se pudo cargar el mapa base. Verifica la URL o la conexión.")
+        st.error("No se pudo cargar el mapa base.\
+         Verifica la URL o la conexión.")
         return
     # Convertir los datos de clientes a GeoDataFrame
     gdf_points = gpd.GeoDataFrame(
         df_points,
-        geometry=gpd.points_from_xy(df_points["Longitud"], df_points["Latitud"]),
+        geometry=gpd.points_from_xy(df_points["Longitud"],
+                                    df_points["Latitud"]), 
         crs="EPSG:4326"
     )
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -203,10 +224,12 @@ def plot_on_basemap(df_points, title="Mapa de Clientes"):
 
 
 def plot_correlation_segmented(df):
-    """Grafica la correlación entre Edad e Ingreso Anual segmentada por Género y Frecuencia de Compra.
+    """Grafica la correlación entre Edad e Ingreso Anual segmentada por
+    Género y Frecuencia de Compra.
 
-    Utiliza seaborn lmplot para crear un FacetGrid donde cada panel corresponde a un valor de Frecuencia_Compra
-    y los puntos se colorean según Género.
+    Utiliza seaborn lmplot para crear un FacetGrid donde cada panel
+    corresponde a un valor de Frecuencia_Compra y los puntos se colorean
+    según Género.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
@@ -224,31 +247,68 @@ def plot_correlation_segmented(df):
         ci=None
     )
     g.fig.suptitle(
-        "Correlación entre Edad e Ingreso Anual segmentado por Género y Frecuencia de Compra",
+        "Correlación entre Edad e Ingreso Anual segmentado\
+        por Género y Frecuencia de Compra",
         y=1.05
     )
     st.pyplot(g.fig)
 
 
-def analyze_correlation(df):
-    """Analiza la correlación entre Edad e Ingreso Anual.
-
-    Calcula la correlación global y la segmentada por Género y Frecuencia de Compra.
+def correlation_calculation(group):
+    """Calcula la correlación entre 'Edad' e 'Ingreso_Anual_USD'
+    para un grupo dado.
 
     Args:
-        df (pd.DataFrame): DataFrame con datos rellenados.
+        group (pd.DataFrame): Subconjunto del DataFrame correspondiente
+         a un grupo.
 
     Returns:
-        dict: Diccionario con resultados de correlación.
+        float: Valor de la correlación entre 'Edad' e 'Ingreso_Anual_USD'
+         para ese grupo.
     """
+    # Se utiliza el método .corr() para calcular la correlación entre las
+    # columnas 'Edad' e 'Ingreso_Anual_USD'
+    return group["Edad"].corr(group["Ingreso_Anual_USD"])
+
+
+def analyze_correlation(df):
+    """Analiza la correlación entre 'Edad' e 'Ingreso_Anual_USD' a
+    nivel global y segmentado.
+
+    Se calcula:
+      - La correlación global.
+      - La correlación para cada grupo de 'Género'.
+      - La correlación para cada grupo de 'Frecuencia_Compra'.
+
+    Args:
+        df (pd.DataFrame): DataFrame con los datos ya rellenados.
+
+    Returns:
+        dict: Diccionario que contiene las correlaciones:
+            - 'global': correlación global.
+            - 'by_gender': correlación segmentada por Género.
+            - 'by_frequency': correlación segmentada por Frecuencia de Compra.
+    """
+    # Calcular la correlación global entre 'Edad' e 'Ingreso_Anual_USD'
     global_corr = df["Edad"].corr(df["Ingreso_Anual_USD"])
-    by_gender = df.groupby("Género").apply(lambda x: x["Edad"].corr(x["Ingreso_Anual_USD"]))
-    by_frequency = df.groupby("Frecuencia_Compra").apply(lambda x: x["Edad"].corr(x["Ingreso_Anual_USD"]))
-    return {"global": global_corr, "by_gender": by_gender, "by_frequency": by_frequency}
+
+    # Agrupar los datos por 'Género' y aplicar la función de cálculo de
+    # correlación a cada grupo
+    by_gender = df.groupby("Género").apply(correlation_calculation)
+
+    # Agrupar los datos por 'Frecuencia_Compra' y aplicar la función de
+    # cálculo de correlación a cada grupo
+    by_frequency = df.groupby("Frecuencia_Compra").apply(
+        correlation_calculation)
+
+    # Retornar un diccionario con los resultados de la correlación
+    return {"global": global_corr, "by_gender": by_gender,
+            "by_frequency": by_frequency}
 
 
 def map_global(df):
-    """Muestra un mapa global de las ubicaciones de los clientes usando el mapa base de Sudamérica.
+    """Muestra un mapa global de las ubicaciones de los clientes
+    usando el mapa base de Sudamérica.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
@@ -270,28 +330,33 @@ def map_by_gender(df):
 
 
 def map_by_frequency(df):
-    """Muestra un mapa de clientes filtrado por Frecuencia de Compra usando el mapa base.
+    """Muestra un mapa de clientes filtrado por Frecuencia de
+    Compra usando el mapa base.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
     """
-    freq = st.selectbox("Seleccione Frecuencia de Compra", df["Frecuencia_Compra"].unique())
+    freq = st.selectbox("Seleccione Frecuencia de Compra",
+                        df["Frecuencia_Compra"].unique())
     filtered = df[df["Frecuencia_Compra"] == freq]
     st.subheader(f"Mapa de Clientes - Frecuencia de Compra: {freq}")
     plot_on_basemap(filtered, title=f"Clientes - Frecuencia: {freq}")
 
 
 def custom_map(df):
-    """Muestra un mapa personalizado basado en rangos de variables numéricas seleccionados por el usuario.
+    """Muestra un mapa personalizado basado en rangos de variables
+    numéricas seleccionados por el usuario.
 
-    El usuario puede seleccionar hasta 4 variables numéricas y definir su rango para filtrar los datos.
+    El usuario puede seleccionar hasta 4 variables numéricas y definir
+    su rango para filtrar los datos.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
     """
     st.subheader("Mapa Personalizado")
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-    selected = st.multiselect("Seleccione hasta 4 variables para filtrar", numeric_cols)
+    selected = st.multiselect("Seleccione hasta 4 variables para filtrar",
+                              numeric_cols)
     filters = pd.Series(True, index=df.index)
     if selected:
         for col in selected:
@@ -312,7 +377,8 @@ def custom_map(df):
 def cluster_analysis(df):
     """Realiza el análisis de clúster basado en Frecuencia de Compra.
 
-    Convierte 'Frecuencia_Compra' a numérico si es necesario, aplica KMeans y muestra los resultados.
+    Convierte 'Frecuencia_Compra' a numérico si es necesario, aplica KMeans
+    y muestra los resultados.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
@@ -322,18 +388,22 @@ def cluster_analysis(df):
     """
     df_cluster = df.copy()
     if not pd.api.types.is_numeric_dtype(df_cluster["Frecuencia_Compra"]):
-        df_cluster["Frecuencia_Compra_num"] = df_cluster["Frecuencia_Compra"].astype("category").cat.codes
+        df_cluster["Frecuencia_Compra_num"] = (
+            df_cluster["Frecuencia_Compra"].astype("category").cat.codes)
     else:
         df_cluster["Frecuencia_Compra_num"] = df_cluster["Frecuencia_Compra"]
     kmeans = KMeans(n_clusters=3, random_state=42)
-    df_cluster["cluster"] = kmeans.fit_predict(df_cluster[["Frecuencia_Compra_num"]])
+    df_cluster["cluster"] = kmeans.fit_predict(
+        df_cluster[["Frecuencia_Compra_num"]])
     st.subheader("Análisis de Clúster")
-    st.dataframe(df_cluster[["ID_Cliente", "Nombre", "Género", "Frecuencia_Compra", "cluster"]])
+    st.dataframe(df_cluster[["ID_Cliente", "Nombre", "Género",
+                             "Frecuencia_Compra", "cluster"]])
     return df_cluster
 
 
 def plot_cluster_on_basemap(df):
-    """Grafica los resultados del análisis de clúster sobre el mapa base de Sudamérica.
+    """Grafica los resultados del análisis de clúster sobre el
+    mapa base de Sudamérica.
 
     Los puntos se colorean según el clúster al que pertenecen.
 
@@ -347,24 +417,28 @@ def plot_cluster_on_basemap(df):
         return
     gdf = gpd.GeoDataFrame(
         df_cluster,
-        geometry=gpd.points_from_xy(df_cluster["Longitud"], df_cluster["Latitud"]),
+        geometry=gpd.points_from_xy(df_cluster["Longitud"],
+                                    df_cluster["Latitud"]),
         crs="EPSG:4326"
     )
     fig, ax = plt.subplots(figsize=(10, 6))
     base_map.plot(ax=ax, color="lightgray", edgecolor="black")
-    gdf.plot(ax=ax, column="cluster", cmap="viridis", markersize=50, legend=True)
+    gdf.plot(ax=ax, column="cluster", cmap="viridis", markersize=50,
+             legend=True)
     ax.set_title("Mapa de Clústeres basado en Frecuencia de Compra")
     st.pyplot(fig)
 
 
 def bar_chart_gender_frequency(df):
-    """Muestra un gráfico de barras segmentado por Género y Frecuencia de Compra.
+    """Muestra un gráfico de barras segmentado por Género y
+    Frecuencia de Compra.
 
     Args:
         df (pd.DataFrame): DataFrame con datos rellenados.
     """
     st.subheader("Gráfico de Barra por Género y Frecuencia de Compra")
-    chart_data = df.groupby(["Género", "Frecuencia_Compra"]).size().unstack(fill_value=0)
+    chart_data = df.groupby(
+        ["Género", "Frecuencia_Compra"]).size().unstack(fill_value=0)
     st.bar_chart(chart_data)
 
 
@@ -408,40 +482,88 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
+    a = (np.sin(dlat / 2.0) ** 2 + np.cos(lat1) *
+         np.cos(lat2) * np.sin(dlon / 2.0) ** 2)
     c = 2 * np.arcsin(np.sqrt(a))
     return 6371 * c
 
 
-def distance_calculation(df):
-    """Calcula las distancias entre el comprador con mayores ingresos global y grupos segmentados.
-
-    Para cada Género y Frecuencia de Compra, calcula la distancia al comprador global.
+def max_income_row(group):
+    """Devuelve la fila del grupo con el mayor 'Ingreso_Anual_USD'.
 
     Args:
-        df (pd.DataFrame): DataFrame con datos rellenados.
+        group (pd.DataFrame): Subconjunto del DataFrame correspondiente a un
+         grupo.
+
+    Returns:
+        pd.Series: La fila del grupo en la que 'Ingreso_Anual_USD' es máximo.
     """
+    # Se utiliza idxmax para obtener el índice del valor máximo
+    max_index = group["Ingreso_Anual_USD"].idxmax()
+    return group.loc[max_index]
+
+
+def distance_calculation(df):
+    """Calcula las distancias entre el comprador global (con mayores ingresos)
+    y los compradores máximos de cada grupo segmentado por 'Género' y
+    'Frecuencia_Compra'.
+
+    Para cada grupo se obtiene la fila con el mayor 'Ingreso_Anual_USD' y se
+    calcula la distancia (usando la función haversine_distance) entre el
+    comprador global y el comprador máximo del grupo.
+
+    Args:
+        df (pd.DataFrame): DataFrame con datos ya rellenados.
+
+    Effects:
+        Muestra en pantalla dos tablas:
+            - Distancias por Género.
+            - Distancias por Frecuencia de Compra.
+    """
+    # Obtener el comprador global (fila con el máximo Ingreso_Anual_USD)
     global_max = df.loc[df["Ingreso_Anual_USD"].idxmax()]
-    by_gender = df.groupby("Género").apply(lambda x: x.loc[x["Ingreso_Anual_USD"].idxmax()]).reset_index(drop=True)
-    by_frequency = df.groupby("Frecuencia_Compra").apply(lambda x: x.loc[x["Ingreso_Anual_USD"].idxmax()]).reset_index(drop=True)
+
+    # Para cada Género, obtener la fila con el mayor Ingreso_Anual_USD
+    by_gender = df.groupby("Género").apply(
+        max_income_row).reset_index(drop=True)
+
+    # Para cada Frecuencia de Compra, obtener la fila con el mayor 
+    # Ingreso_Anual_USD
+    by_frequency = df.groupby("Frecuencia_Compra").apply(
+        max_income_row).reset_index(drop=True)
+
+    # Calcular la distancia desde el comprador global a cada comprador
+    # máximo por Género
     by_gender["distance_to_global"] = haversine_distance(
         global_max["Latitud"], global_max["Longitud"],
         by_gender["Latitud"], by_gender["Longitud"]
     )
+
+    # Calcular la distancia desde el comprador global a cada comprador máximo
+    # por Frecuencia de Compra
     by_frequency["distance_to_global"] = haversine_distance(
         global_max["Latitud"], global_max["Longitud"],
         by_frequency["Latitud"], by_frequency["Longitud"]
     )
-    st.subheader("Distancias (por Género) desde el comprador de mayores ingresos global")
-    st.dataframe(by_gender[["Género", "Ingreso_Anual_USD", "distance_to_global"]])
-    st.subheader("Distancias (por Frecuencia de Compra) desde el comprador de mayores ingresos global")
-    st.dataframe(by_frequency[["Frecuencia_Compra", "Ingreso_Anual_USD", "distance_to_global"]])
+
+    # Mostrar los resultados en la aplicación (por ejemplo, usando Streamlit)
+    st.subheader("Distancias (por Género) desde el\
+    comprador de mayores ingresos global")
+    st.dataframe(by_gender[["Género", "Ingreso_Anual_USD",
+                            "distance_to_global"]])
+
+    st.subheader("Distancias (por Frecuencia de Compra) desde\
+    el comprador de mayores ingresos global")
+    st.dataframe(by_frequency[["Frecuencia_Compra", "Ingreso_Anual_USD",
+                               "distance_to_global"]])
+
 
 
 def main():
     st.title("Análisis de Datos de Clientes")
     st.sidebar.header("Carga de datos")
-    source_type = st.sidebar.radio("Seleccione la fuente de datos:", ("Archivo", "URL"))
+    source_type = st.sidebar.radio("Seleccione la fuente de datos:",
+     ("Archivo", "URL"))
 
     if source_type == "Archivo":
         file = st.sidebar.file_uploader("Sube un archivo CSV", type="csv")
@@ -459,7 +581,7 @@ def main():
         st.subheader("Datos con valores faltantes rellenados")
         st.dataframe(df_filled)
 
-        # Corregir coordenadas que caen en el mar (se corrige usando el mapa base de Sudamérica)
+        # Corregir coordenadas que caen en el mar 
         land_gdf = cargar_mapa_base(URL_GEOPACKAGE)
         if land_gdf is not None:
             df_filled = corregir_coordenadas(df_filled, land_gdf)
