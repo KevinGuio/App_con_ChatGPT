@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import geopandas as gpd
 import pydeck as pdk
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 
 @st.cache_data
@@ -29,7 +30,7 @@ def fill_missing_values(df):
     """Fill missing values in the DataFrame using binning for grouping.
 
     The method creates bins for numeric columns used in grouping keys to better handle
-    imputation, y luego aplica agrupaciones para rellenar los valores faltantes.
+    imputation, and then applies group-based aggregation to fill the missing values.
 
     Args:
         df (pd.DataFrame): Input DataFrame with missing values.
@@ -48,7 +49,7 @@ def fill_missing_values(df):
     df_filled['Historial_bin'] = pd.qcut(df_filled['Historial_Compras'], q=4, duplicates='drop')
     df_filled['Edad_bin'] = pd.qcut(df_filled['Edad'], q=4, duplicates='drop')
 
-    # Para 'Frecuencia_Compra': si es numérica se usa qcut; de lo contrario se convierten a códigos
+    # Para 'Frecuencia_Compra': si es numérica se usa qcut; de lo contrario se convierte a códigos
     df_filled['Frecuencia_bin'] = (
         pd.qcut(df_filled['Frecuencia_Compra'], q=4, duplicates='drop')
         if pd.api.types.is_numeric_dtype(df_filled['Frecuencia_Compra'])
@@ -81,7 +82,7 @@ def fill_missing_values(df):
         .transform('median')
     )
 
-    # Eliminar columnas temporales
+    # Eliminar columnas temporales de bins
     df_filled = df_filled.drop(columns=['Ingreso_bin', 'Historial_bin', 'Frecuencia_bin', 'Edad_bin'])
 
     # Respaldo global para cualquier valor faltante restante
@@ -94,6 +95,40 @@ def fill_missing_values(df):
     })
 
     return df_filled
+
+def cargar_mapa_base(url_geopackage):
+    """
+    Carga un mapa base mundial desde un GeoPackage.
+
+    Args:
+        url_geopackage (str): URL del GeoPackage con los datos de mapa base.
+
+    Returns:
+        gpd.GeoDataFrame: GeoDataFrame con el mapa base.
+    """
+    mapa_base = gpd.read_file(url_geopackage)
+    return mapa_base
+
+def plot_on_basemap(df_points, url_geopackage, title="Mapa de Clientes"):
+    """Plot client locations on a base map loaded from a GeoPackage.
+
+    Args:
+        df_points (pd.DataFrame): DataFrame with columns 'Latitud' y 'Longitud'.
+        url_geopackage (str): URL del GeoPackage con el mapa base.
+        title (str, optional): Título del gráfico.
+    """
+    base_map = cargar_mapa_base(url_geopackage)
+    # Convertir los datos de clientes a GeoDataFrame
+    gdf_points = gpd.GeoDataFrame(
+        df_points,
+        geometry=gpd.points_from_xy(df_points['Longitud'], df_points['Latitud']),
+        crs="EPSG:4326"
+    )
+    fig, ax = plt.subplots(figsize=(10, 6))
+    base_map.plot(ax=ax, color="lightgray", edgecolor="black")
+    gdf_points.plot(ax=ax, color="red", markersize=50)
+    ax.set_title(title)
+    st.pyplot(fig)
 
 def analyze_correlation(df):
     """Analyze correlation between Edad and Ingreso_Anual_USD.
@@ -112,16 +147,20 @@ def analyze_correlation(df):
     return {'global': global_corr, 'by_gender': by_gender, 'by_frequency': by_frequency}
 
 def map_global(df):
-    """Display a global map of client locations.
+    """Display a global map of client locations using a base map from a GeoPackage.
 
     Args:
         df (pd.DataFrame): DataFrame with filled data.
     """
     st.subheader("Mapa Global de Clientes")
-    st.map(df[['Latitud', 'Longitud']])
+    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
+    if url_geo:
+        plot_on_basemap(df, url_geo, title="Clientes Globales")
+    else:
+        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
 
 def map_by_gender(df):
-    """Display a map of client locations filtered by Género.
+    """Display a map of client locations filtered by Género using the base map.
 
     Args:
         df (pd.DataFrame): DataFrame with filled data.
@@ -129,10 +168,14 @@ def map_by_gender(df):
     gender = st.selectbox("Seleccione Género", df['Género'].unique())
     filtered = df[df['Género'] == gender]
     st.subheader(f"Mapa de Clientes - Género: {gender}")
-    st.map(filtered[['Latitud', 'Longitud']])
+    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
+    if url_geo:
+        plot_on_basemap(filtered, url_geo, title=f"Clientes - Género: {gender}")
+    else:
+        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
 
 def map_by_frequency(df):
-    """Display a map of client locations filtered by Frecuencia de Compra.
+    """Display a map of client locations filtered by Frecuencia de Compra using the base map.
 
     Args:
         df (pd.DataFrame): DataFrame with filled data.
@@ -140,10 +183,14 @@ def map_by_frequency(df):
     freq = st.selectbox("Seleccione Frecuencia de Compra", df['Frecuencia_Compra'].unique())
     filtered = df[df['Frecuencia_Compra'] == freq]
     st.subheader(f"Mapa de Clientes - Frecuencia de Compra: {freq}")
-    st.map(filtered[['Latitud', 'Longitud']])
+    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
+    if url_geo:
+        plot_on_basemap(filtered, url_geo, title=f"Clientes - Frecuencia: {freq}")
+    else:
+        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
 
 def custom_map(df):
-    """Display a custom map based on user-selected variable ranges.
+    """Display a custom map based on user-selected variable ranges using the base map.
 
     The user can select up to four numeric variables and specify their range to filter the data.
 
@@ -153,20 +200,21 @@ def custom_map(df):
     st.subheader("Mapa Personalizado")
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
     selected = st.multiselect("Seleccione hasta 4 variables para filtrar", numeric_cols)
+    filters = pd.Series(True, index=df.index)
     if selected:
-        # Se inicia una condición de filtrado (vectorizada)
-        filters = pd.Series(True, index=df.index)
         for col in selected:
             col_min = float(df[col].min())
             col_max = float(df[col].max())
             range_val = st.slider(f"Rango para {col}", min_value=col_min, max_value=col_max,
                                     value=(col_min, col_max))
             filters &= df[col].between(range_val[0], range_val[1])
-        filtered = df[filters]
+    filtered = df[filters]
+    url_geo = st.sidebar.text_input("URL del GeoPackage para mapa base", "")
+    if url_geo:
+        plot_on_basemap(filtered, url_geo, title="Mapa Personalizado")
+        st.dataframe(filtered)
     else:
-        filtered = df
-    st.map(filtered[['Latitud', 'Longitud']])
-    st.dataframe(filtered)
+        st.error("Por favor ingrese la URL del GeoPackage en la barra lateral.")
 
 def cluster_analysis(df):
     """Perform clustering analysis based on Frecuencia_Compra.
@@ -187,7 +235,6 @@ def cluster_analysis(df):
     kmeans = KMeans(n_clusters=3, random_state=42)
     df_cluster['cluster'] = kmeans.fit_predict(df_cluster[['Frecuencia_Compra_num']])
     st.subheader("Análisis de Clúster")
-    st.map(df_cluster[['Latitud', 'Longitud']].assign(cluster=df_cluster['cluster']))
     st.dataframe(df_cluster[['ID_Cliente', 'Nombre', 'Género', 'Frecuencia_Compra', 'cluster']])
     return df_cluster
 
