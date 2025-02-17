@@ -562,7 +562,7 @@ def load_region_mapping():
             region_mapping['DEPARTAMENTO']
             .apply(lambda x: unidecode(x).upper().strip()
             .str.replace(r'[^A-Z]', '', regex=True)
-        )
+        ))
         
         return region_mapping[['REGION', 'DPTOS_NORM']].rename(columns={'DPTOS_NORM': 'DPTOS'})
         
