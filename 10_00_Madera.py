@@ -418,7 +418,13 @@ def prepare_geo_data(df):
         # Cargar dataset geográfico
         geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
         geo_df = pd.read_csv(geo_url)
+        df = df.copy()
         
+        # Normalizar nombres
+        df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
+        df['MUNICIPIO'] = df['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
+        geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
+        geo_df['NOM_MPIO'] = geo_df['NOM_MPIO'].apply(lambda x: unidecode(x).upper().strip())
         
         # Fusionar datos
         merged = geo_df.merge(df.groupby(['DPTO', 'MUNICIPIO']).agg({'VOLUMEN_M3': 'sum'}),
