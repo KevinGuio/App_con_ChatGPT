@@ -607,7 +607,7 @@ def calculate_regional_diversity(df, region_mapping):
         SHANNON_INDEX=('SHANNON_TERM', lambda x: -x.sum()),
         TOTAL_ESPECIES=('ESPECIE', 'nunique'),
         VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum'),
-        DEPARTAMENTOS=('DPTO', lambda x: ', '.join(sorted(set(x))))
+        DEPARTAMENTOS=('DPTO', lambda x: ', '.join(sorted(set(x)))))
     
     return shannon_df.sort_values('SHANNON_INDEX', ascending=False).reset_index()
 
