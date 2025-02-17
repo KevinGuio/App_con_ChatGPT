@@ -410,7 +410,29 @@ def plot_comparison_chart(df, top_n=5):
     
     fig.update_layout(xaxis={'categoryorder':'total descending'},
                     hovermode='x unified')
-    return fig        
+    return fig
+
+def prepare_geo_data(df):
+    """Prepara datos geográficos fusionando con ubicaciones de municipios."""
+    try:
+        # Cargar dataset geográfico
+        geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+        geo_df = pd.read_csv(geo_url)
+        
+        
+        # Fusionar datos
+        merged = geo_df.merge(df.groupby(['DPTO', 'MUNICIPIO']).agg({'VOLUMEN_M3': 'sum'}),
+                            left_on=['NOM_DPTO', 'NOM_MPIO'],
+                            right_on=['DPTO', 'MUNICIPIO'],
+                            how='right')
+        
+        return gpd.GeoDataFrame(
+            merged,
+            geometry=gpd.points_from_xy(merged.LONGITUD, merged.LATITUD)
+        )
+    except Exception as e:
+        raise ValueError(f"Error preparando datos geográficos: {str(e)}")
+        
 
 def prepare_clustering_data(df, level='department'):
     """Prepara los datos para clustering agrupando por nivel geográfico."""
@@ -841,6 +863,7 @@ def main():
                 
                 # Preparar datos
                 clustering_data = prepare_clustering_data(df_clean, level)
+                geo_data = prepare_geo_data(df_clean)
                 
                 # Realizar clustering
                 cluster_results, pca, scaler, model = perform_clustering(
