@@ -27,46 +27,66 @@ def handle_missing_values(df):
     df = df.copy()
     numeric_cols = df.select_dtypes(include=np.number).columns
     
-    # Crear copias independientes de las columnas
     for col in numeric_cols:
         df[col] = df[col].interpolate(method='nearest' if np.issubdtype(df[col].dtype, np.integer) else 'linear').copy()
     
     return df
+
+def plot_top_species(df):
+    """Crea gráfico de barras de las 10 especies con mayor volumen."""
+    df = df.copy()
+    
+    if 'ESPECIE' not in df.columns or 'VOLUMEN_M3' not in df.columns:
+        raise ValueError("Dataset no contiene las columnas requeridas")
+    
+    # Calcular y ordenar los datos
+    top_species = df.groupby('ESPECIE', observed=False)['VOLUMEN_M3']\
+                   .sum()\
+                   .nlargest(10)\
+                   .reset_index()
+    
+    # Crear gráfico interactivo
+    fig = px.bar(top_species, 
+                 x='VOLUMEN_M3', 
+                 y='ESPECIE', 
+                 orientation='h',
+                 title='Top 10 Especies con Mayor Volumen Movilizado',
+                 labels={'VOLUMEN_M3': 'Volumen Total (m³)', 'ESPECIE': 'Especie'},
+                 color='VOLUMEN_M3',
+                 color_continuous_scale='Greens')
+    
+    fig.update_layout(showlegend=False,
+                    yaxis={'categoryorder':'total ascending'},
+                    height=500)
+    return fig
 
 def get_top_species(df):
     """Identifica top 5 especies con validación de columnas."""
     df = df.copy()
     required = {'DPTO', 'ESPECIE', 'VOLUMEN_M3'}
     
-    # Verificar existencia de columnas normalizadas
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
     
-    # Agrupar con operaciones vectorizadas
     grouped = df.groupby(['DPTO', 'ESPECIE'], observed=False, as_index=False).agg(
         VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum')
     )
     
-    # Filtrar top 5 por departamento
     grouped['RANK'] = grouped.groupby('DPTO')['VOLUMEN_TOTAL'].rank(ascending=False, method='dense')
     return grouped[grouped['RANK'] <= 5].sort_values(['DPTO', 'RANK']).drop(columns='RANK')
 
 def create_heatmap(df):
     """Crea mapa de calor con Plotly Express."""
-    # Cargar datos geográficos
     geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
     geo_df = pd.read_csv(geo_url)
     
-    # Normalizar nombres en ambos datasets
     df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
     geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
     
-    # Calcular centroides por departamento
     dept_volumes = df.groupby('DPTO', observed=False)['VOLUMEN_M3'].sum().reset_index()
     merged = geo_df.merge(dept_volumes, left_on='NOM_DPTO', right_on='DPTO')
     
-    # Crear mapa interactivo
     fig = px.density_mapbox(
         merged,
         lat='LATITUD',
@@ -85,45 +105,59 @@ def create_heatmap(df):
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
-    # Carga de datos
     uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
     url = st.text_input("O ingresar URL de datos CSV")
     
     if uploaded_file or url:
         try:
-            # Procesamiento inicial
             df = load_data(uploaded_file, url)
             df_clean = handle_missing_values(df)
             
-            # Sección de datos
             with st.expander("📥 Datos Originales"):
                 st.dataframe(df)
             
             with st.expander("🧹 Datos Procesados"):
                 st.dataframe(df_clean)
             
-            # Análisis de especies
-            st.header("🔝 Top 5 Especies por Departamento")
+            # Sección de Top 10 Especies
+            st.header("🏆 Top 10 Especies a Nivel Nacional")
             try:
-                top_species = get_top_species(df_clean)
-                st.dataframe(top_species)
+                fig_top10 = plot_top_species(df_clean)
+                st.plotly_chart(fig_top10, use_container_width=True)
                 
-                # Métricas
+                # Calcular métricas
+                top_data = df_clean.groupby('ESPECIE')['VOLUMEN_M3'].sum().nlargest(10)
+                total = top_data.sum()
+                avg = top_data.mean()
+                
                 cols = st.columns(3)
-                cols[0].metric("📦 Volumen Total", f"{top_species['VOLUMEN_TOTAL'].sum():,.0f} m³")
-                cols[1].metric("🌳 Especies Únicas", top_species['ESPECIE'].nunique())
-                cols[2].metric("🗺️ Departamentos", top_species['DPTO'].nunique())
+                cols[0].metric("📦 Volumen Total Top 10", f"{total:,.0f} m³")
+                cols[1].metric("📊 Promedio por Especie", f"{avg:,.0f} m³")
+                cols[2].metric("🌿 Especies Únicas", len(top_data))
                 
             except ValueError as e:
                 st.error(str(e))
             
-            # Mapa de calor
+            # Sección de Top 5 por Departamento
+            st.header("📊 Análisis por Departamento")
+            try:
+                top_species = get_top_species(df_clean)
+                st.dataframe(top_species)
+                
+            except ValueError as e:
+                st.error(str(e))
+            
+            # Mapa de Calor
             st.header("🌎 Mapa de Distribución")
-            fig = create_heatmap(df_clean)
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                fig_map = create_heatmap(df_clean)
+                st.plotly_chart(fig_map, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"Error en el mapa: {str(e)}")
             
         except Exception as e:
-            st.error(f"🚨 Error: {str(e)}")
+            st.error(f"🚨 Error general: {str(e)}")
 
 if __name__ == "__main__":
     main()
