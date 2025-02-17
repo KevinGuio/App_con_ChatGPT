@@ -195,6 +195,67 @@ def plot_temporal_evolution(df):
     return fig
     
 
+def detect_outliers(df, method='zscore'):
+    """Detecta outliers usando diferentes métodos estadísticos.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con los datos
+        method (str): Método a usar ('zscore' o 'iqr')
+    
+    Returns:
+        tuple: (DataFrame con outliers, métricas relevantes)
+    """
+    df = df.copy()
+    
+    if 'VOLUMEN_M3' not in df.columns:
+        raise ValueError("Columna VOLUMEN_M3 no encontrada")
+    
+    # Calcular métricas base
+    stats = {
+        'media': df['VOLUMEN_M3'].mean(),
+        'mediana': df['VOLUMEN_M3'].median(),
+        'std': df['VOLUMEN_M3'].std(),
+        'q1': df['VOLUMEN_M3'].quantile(0.25),
+        'q3': df['VOLUMEN_M3'].quantile(0.75)
+    }
+    
+    # Detección de outliers
+    if method == 'zscore':
+        df['zscore'] = np.abs((df['VOLUMEN_M3'] - stats['media']) / stats['std'])
+        outliers = df[df['zscore'] > 3]
+    elif method == 'iqr':
+        iqr = stats['q3'] - stats['q1']
+        lower_bound = stats['q1'] - 1.5 * iqr
+        upper_bound = stats['q3'] + 1.5 * iqr
+        outliers = df[(df['VOLUMEN_M3'] < lower_bound) | (df['VOLUMEN_M3'] > upper_bound)]
+    else:
+        raise ValueError("Método no válido. Usar 'zscore' o 'iqr'")
+    
+    # Calcular métricas adicionales
+    stats.update({
+        'total_outliers': len(outliers),
+        'porcentaje_outliers': (len(outliers) / len(df)) * 100,
+        'min_outlier': outliers['VOLUMEN_M3'].min() if not outliers.empty else None,
+        'max_outlier': outliers['VOLUMEN_M3'].max() if not outliers.empty else None
+    })
+    
+    return outliers, stats
+
+def plot_outliers(df, stats):
+    """Crea visualizaciones interactivas para los outliers."""
+    fig = px.box(df, y='VOLUMEN_M3', title='Distribución de Volúmenes con Outliers',
+                labels={'VOLUMEN_M3': 'Volumen (m³)'})
+    
+    fig.add_annotation(x=0, y=stats['mediana'], text=f"Mediana: {stats['mediana']:.2f}",
+                      showarrow=False, yshift=10)
+    
+    fig2 = px.histogram(df, x='VOLUMEN_M3', nbins=50, 
+                       title='Histograma de Frecuencias con Outliers',
+                       labels={'VOLUMEN_M3': 'Volumen (m³)'})
+    
+    return fig, fig2
+
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -314,6 +375,57 @@ def main():
             except ValueError as e:
                 st.error(str(e))
 
+        # Nueva sección de análisis de outliers
+            st.header("📊 Detección de Outliers")
+            
+            try:
+                # Selección de método
+                method = st.selectbox('Seleccionar método de detección:', 
+                                    ['zscore', 'iqr'], index=0)
+                
+                # Detectar outliers
+                outliers, stats = detect_outliers(df_clean, method)
+                
+                # Mostrar métricas en columnas
+                col1, col2, col3 = st.columns(3)
+                col1.metric("🔍 Outliers Detectados", stats['total_outliers'])
+                col2.metric("📈 Porcentaje de Outliers", f"{stats['porcentaje_outliers']:.2f}%")
+                col3.metric("📏 Rango de Outliers", 
+                           f"{stats['min_outlier']:.2f} - {stats['max_outlier']:.2f}" 
+                           if outliers.any().any() else "N/A")
+                
+                # Visualizaciones
+                fig_box, fig_hist = plot_outliers(df_clean, stats)
+                st.plotly_chart(fig_box, use_container_width=True)
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+                # Mostrar tabla de outliers
+                with st.expander("🔍 Ver detalles de outliers"):
+                    st.dataframe(outliers.sort_values('VOLUMEN_M3', ascending=False))
+                    
+                    # Botón de descarga
+                    csv = outliers.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Descargar outliers como CSV",
+                        csv,
+                        "outliers.csv",
+                        "text/csv",
+                        key='download-outliers'
+                    )
+                
+                # Explicación estadística
+                with st.expander("📚 Explicación técnica"):
+                    st.markdown(f"""
+                    **Método usado:** {'Z-Score' if method == 'zscore' else 'IQR'}
+                    - **Media:** {stats['media']:.2f}
+                    - **Desviación estándar:** {stats['std']:.2f}
+                    - **Rango intercuartílico (IQR):** {stats['q3'] - stats['q1']:.2f}
+                    - **Límite inferior:** {stats.get('q1', 0) - 1.5*(stats['q3'] - stats['q1']):.2f}
+                    - **Límite superior:** {stats.get('q3', 0) + 1.5*(stats['q3'] - stats['q1']):.2f}
+                    """)
+                
+            except ValueError as e:
+                st.error(str(e))
         
         except Exception as e:
             st.error(f"🚨 Error general: {str(e)}")
