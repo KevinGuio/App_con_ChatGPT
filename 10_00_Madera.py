@@ -278,7 +278,7 @@ def main():
                 
                 # Mostrar datos subyacentes
                 with st.expander("Ver datos geográficos procesados"):
-                    st.dataframe(gdf[['departamento', 'municipio', 'VOLUMEN M3']])
+                    st.dataframe(gdf[['NOM_DPTO', 'NOM_MPIO', 'VOLUMEN M3']])
                     
             except Exception as e:
                 st.error(f"Error generando mapa: {str(e)}")
