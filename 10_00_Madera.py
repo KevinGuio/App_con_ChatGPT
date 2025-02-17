@@ -931,45 +931,45 @@ def main():
             except ValueError as e:
                 st.error(str(e))
 
+                    # Nueva sección de diversidad de especies
+            st.header("🌿 Diversidad de Especies")
+            try:
+                shannon_df = calculate_shannon_index(df_clean)
+                
+                # Mostrar métricas rápidas
+                max_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmax()]
+                min_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmin()]
+                
+                cols = st.columns(3)
+                cols[0].metric("Valor Máximo", 
+                              f"{max_diversity['SHANNON_INDEX']:.2f}", 
+                              max_diversity['DPTO'])
+                cols[1].metric("Valor Mínimo", 
+                              f"{min_diversity['SHANNON_INDEX']:.2f}", 
+                              min_diversity['DPTO'])
+                cols[2].metric("Promedio Nacional", 
+                              f"{shannon_df['SHANNON_INDEX'].mean():.2f}")
+                
+                # Mostrar gráfico y datos
+                fig_shannon = plot_shannon_diversity(shannon_df)
+                st.plotly_chart(fig_shannon, use_container_width=True)
+                
+                with st.expander("🔍 Ver datos detallados de diversidad"):
+                    st.dataframe(shannon_df.style.format({'SHANNON_INDEX': '{:.2f}'}))
+                    
+                    # Botón de descarga
+                    csv = shannon_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Descargar índices de diversidad",
+                        csv,
+                        "indices_diversidad.csv",
+                        "text/csv",
+                        key='download-diversity'
+                    )
+                    
+            except ValueError as e:
+                st.error(str(e))
 
-        # Nueva sección de diversidad de especies
-st.header("🌿 Diversidad de Especies")
-try:
-    shannon_df = calculate_shannon_index(df_clean)
-    
-    # Mostrar métricas rápidas
-    max_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmax()]
-    min_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmin()]
-    
-    cols = st.columns(3)
-    cols[0].metric("Valor Máximo", 
-                  f"{max_diversity['SHANNON_INDEX']:.2f}", 
-                  max_diversity['DPTO'])
-    cols[1].metric("Valor Mínimo", 
-                  f"{min_diversity['SHANNON_INDEX']:.2f}", 
-                  min_diversity['DPTO'])
-    cols[2].metric("Promedio Nacional", 
-                  f"{shannon_df['SHANNON_INDEX'].mean():.2f}")
-    
-    # Mostrar gráfico y datos
-    fig_shannon = plot_shannon_diversity(shannon_df)
-    st.plotly_chart(fig_shannon, use_container_width=True)
-    
-    with st.expander("🔍 Ver datos detallados de diversidad"):
-        st.dataframe(shannon_df.style.format({'SHANNON_INDEX': '{:.2f}'}))
-        
-        # Botón de descarga
-        csv = shannon_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Descargar índices de diversidad",
-            csv,
-            "indices_diversidad.csv",
-            "text/csv",
-            key='download-diversity'
-        )
-        
-except ValueError as e:
-    st.error(str(e))
                 
         
         except Exception as e:
