@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-
 def load_data(uploaded_file=None, url=None):
     """Carga datos desde un archivo CSV subido o una URL.
 
@@ -26,7 +25,6 @@ def load_data(uploaded_file=None, url=None):
         raise ValueError("Debe proporcionar un archivo o URL")
     except Exception as e:
         raise Exception(f"Error cargando datos: {str(e)}") from e
-
 
 def handle_missing_values(df):
     """Rellena valores faltantes usando interpolación según tipo de dato de la columna.
@@ -54,9 +52,8 @@ def handle_missing_values(df):
     
     return df_filled
 
-
 def get_top_species(df):
-    """Identifica las 10 especies más comunes y sus volúmenes por departamento.
+    """Identifica las 5 especies más comunes y sus volúmenes por departamento.
 
     Args:
         df (pd.DataFrame): DataFrame con los datos procesados
@@ -70,14 +67,18 @@ def get_top_species(df):
         raise ValueError("El dataset no contiene las columnas requeridas")
     
     # Agrupar y sumar volúmenes
-    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=True)['VOLUMEN M3'].sum().reset_index()
+    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=True)['VOLUMEN M3']\
+                .sum()\
+                .reset_index()
     
-    # Ordenar y seleccionar top 10 por departamento
-    grouped['Rank'] = grouped.groupby('DPTO')['VOLUMEN M3'].rank(method='dense', ascending=False)
-    top_species = grouped[grouped['Rank'] <= 10].sort_values(['DPTO', 'Rank'])
+    # Ordenar y seleccionar top 5 por departamento
+    grouped['Rank'] = grouped.groupby('DPTO')['VOLUMEN M3']\
+                            .rank(method='dense', ascending=False)
+    top_species = grouped[grouped['Rank'] <= 5]\
+                    .sort_values(['DPTO', 'Rank'])\
+                    .reset_index(drop=True)
     
-    return top_species.drop(columns='Rank').reset_index(drop=True)
-
+    return top_species.drop(columns='Rank')
 
 def main():
     """Función principal para la aplicación Streamlit."""
@@ -128,7 +129,7 @@ def main():
             try:
                 top_species = get_top_species(df_clean)
                 
-                st.subheader("Top 10 Especies por Volumen y Departamento")
+                st.subheader("Top 5 Especies por Volumen y Departamento")
                 st.dataframe(top_species)
                 
                 # Mostrar métricas resumidas
@@ -137,16 +138,20 @@ def main():
                 total_species = top_species['ESPECIE'].nunique()
                 
                 cols = st.columns(3)
-                cols[0].metric("Volumen Total (m³)", f"{total_volume:,.2f}")
+                cols[0].metric("Volumen Total Top 5 (m³)", f"{total_volume:,.2f}")
                 cols[1].metric("Promedio por Especie", f"{avg_volume:,.2f}")
-                cols[2].metric("Especies Únicas", total_species)
+                cols[2].metric("Especies Únicas Top 5", total_species)
+                
+                # Gráfico adicional
+                st.subheader("Distribución de Volúmenes Top 5")
+                chart_data = top_species.groupby('DPTO')['VOLUMEN M3'].sum()
+                st.bar_chart(chart_data)
                 
             except ValueError as e:
                 st.warning(str(e))
 
         except Exception as e:
             st.error(f"Error en procesamiento: {str(e)}")
-
 
 if __name__ == "__main__":
     main()
