@@ -415,10 +415,12 @@ def plot_comparison_chart(df, top_n=5):
 def prepare_geo_data(df):
     """Prepara datos geográficos fusionando con ubicaciones de municipios."""
     try:
+        # Crear copia del DataFrame original
+        df = df.copy()
+        
         # Cargar dataset geográfico
         geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
-        geo_df = pd.read_csv(geo_url)
-        df = df.copy()
+        geo_df = pd.read_csv(geo_url).copy()  # Crear copia del geo_df
         
         # Normalizar nombres
         df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
@@ -426,79 +428,31 @@ def prepare_geo_data(df):
         geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
         geo_df['NOM_MPIO'] = geo_df['NOM_MPIO'].apply(lambda x: unidecode(x).upper().strip())
         
-        # Fusionar datos
-        merged = geo_df.merge(df.groupby(['DPTO', 'MUNICIPIO']).agg({'VOLUMEN_M3': 'sum'}),
-                            left_on=['NOM_DPTO', 'NOM_MPIO'],
-                            right_on=['DPTO', 'MUNICIPIO'],
-                            how='right')
+        # Fusionar datos creando copias independientes
+        merged = geo_df.copy().merge(
+            df.groupby(['DPTO', 'MUNICIPIO']).agg({'VOLUMEN_M3': 'sum'}).copy(),
+            left_on=['NOM_DPTO', 'NOM_MPIO'],
+            right_on=['DPTO', 'MUNICIPIO'],
+            how='right'
+        )
         
         return gpd.GeoDataFrame(
-            merged,
-            geometry=gpd.points_from_xy(merged.LONGITUD, merged.LATITUD)
+            merged.copy(),  # Copia final del DataFrame fusionado
+            geometry=gpd.points_from_xy(merged.LONGITUD.copy(), merged.LATITUD.copy())
         )
     except Exception as e:
         raise ValueError(f"Error preparando datos geográficos: {str(e)}")
-        
-
-def prepare_clustering_data(df, level='department'):
-    """Prepara los datos para clustering agrupando por nivel geográfico."""
-    df = df.copy()
-    
-    # Agrupar datos según nivel seleccionado
-    if level == 'department':
-        group_col = 'DPTO'
-    else:
-        group_col = 'MUNICIPIO'
-    
-    # Crear características para el clustering
-    features = df.groupby(group_col, observed=False).agg({
-        'VOLUMEN_M3': ['sum', 'mean', 'std'],
-        'ESPECIE': pd.Series.nunique,
-        'TIPO_PRODUCTO': pd.Series.nunique
-    }).reset_index()
-    
-    # Renombrar columnas
-    features.columns = [
-        group_col,
-        'volumen_total',
-        'volumen_promedio',
-        'volumen_std',
-        'especies_unicas',
-        'productos_unicos'
-    ]
-    
-    # Manejar valores NaN
-    features.fillna(0, inplace=True)
-    
-    return features
-
-def perform_clustering(data, n_clusters=3):
-    """Realiza el clustering usando K-means con reducción dimensional."""
-    # Escalar características
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(data)
-    
-    # Reducción dimensional
-    pca = PCA(n_components=2)
-    principal_components = pca.fit_transform(scaled_data)
-    
-    # Clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    clusters = kmeans.fit_predict(scaled_data)
-    
-    # Crear DataFrame con resultados
-    results = pd.DataFrame({
-        'cluster': clusters,
-        'PC1': principal_components[:, 0],
-        'PC2': principal_components[:, 1]
-    })
-    
-    return results, pca, scaler, kmeans
 
 def plot_clusters_on_map(geo_data, cluster_data, level='department'):
     """Muestra los clusters en un mapa interactivo."""
+    # Crear copias independientes de los datos
+    geo_copy = geo_data.copy()
+    cluster_copy = cluster_data.copy()
+    
     # Combinar datos geográficos con clusters
-    merged = geo_data.merge(cluster_data, on='DPTO' if level == 'department' else 'MUNICIPIO')
+    merged = geo_copy.merge(cluster_copy, 
+                          on='DPTO' if level == 'department' else 'MUNICIPIO',
+                          how='inner').copy()
     
     # Crear mapa
     fig = px.scatter_mapbox(merged,
@@ -517,6 +471,25 @@ def plot_clusters_on_map(geo_data, cluster_data, level='department'):
     fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0},
                     coloraxis_showscale=False)
     return fig
+
+def calculate_municipality_volumes(df):
+    """Calcula el volumen total por municipio con geolocalización."""
+    df = df.copy()
+    
+    # Cargar datos geográficos con copia
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_df = pd.read_csv(geo_url).copy()
+    
+    # Resto del código manteniendo copias en cada operación...
+    merged = geo_df.copy().merge(
+        df.groupby(['DPTO', 'MUNICIPIO'], observed=False)
+          .agg({'VOLUMEN_M3': 'sum'}).copy(),
+        left_on=['NOM_DPTO', 'NOM_MPIO'],
+        right_on=['DPTO', 'MUNICIPIO'],
+        how='right'
+    )
+    
+    return merged[['DPTO', 'MUNICIPIO', 'LATITUD', 'LONGITUD', 'VOLUMEN_TOTAL']].copy()
     
 
 def main():
