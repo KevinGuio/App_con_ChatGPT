@@ -501,7 +501,55 @@ def perform_clustering(data, n_clusters=3):
     
     return results, pca, scaler, kmeans
 
+def calculate_shannon_index(df):
+    """Calcula el Índice de Diversidad de Shannon por departamento.
     
+    Args:
+        df (pd.DataFrame): DataFrame con columnas DPTO, ESPECIE, VOLUMEN_M3
+        
+    Returns:
+        pd.DataFrame: DataFrame con índice de diversidad por departamento
+    """
+    df = df.copy()
+    
+    # Validar columnas requeridas
+    required = {'DPTO', 'ESPECIE', 'VOLUMEN_M3'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes para cálculo de diversidad: {', '.join(missing)}")
+    
+    # Calcular proporciones por especie en cada departamento
+    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=False)['VOLUMEN_M3'].sum().reset_index()
+    total_por_dpto = grouped.groupby('DPTO', observed=False)['VOLUMEN_M3'].transform('sum')
+    grouped['PROPORCION'] = grouped['VOLUMEN_M3'] / total_por_dpto
+    
+    # Calcular términos del índice
+    grouped['SHANNON_TERM'] = grouped['PROPORCION'] * np.log(grouped['PROPORCION'])
+    
+    # Sumar términos por departamento y calcular índice final
+    shannon_df = grouped.groupby('DPTO', observed=False).agg(
+        SHANNON_INDEX=('SHANNON_TERM', lambda x: -x.sum())
+    ).reset_index()
+    
+    return shannon_df.sort_values('SHANNON_INDEX', ascending=False)
+
+def plot_shannon_diversity(shannon_df):
+    """Crea gráfico de barras interactivo para el índice de Shannon."""
+    fig = px.bar(shannon_df,
+                 x='DPTO',
+                 y='SHANNON_INDEX',
+                 title='Diversidad de Especies por Departamento (Índice de Shannon)',
+                 labels={'SHANNON_INDEX': 'Índice de Diversidad', 'DPTO': 'Departamento'},
+                 color='SHANNON_INDEX',
+                 color_continuous_scale='Tealrose')
+    
+    fig.update_layout(
+        xaxis={'categoryorder': 'total descending'},
+        hovermode='x unified',
+        height=500
+    )
+    return fig
+  
 
 def main():
     st.title("🌳 Análisis de Producción Maderera")
@@ -882,6 +930,46 @@ def main():
                 
             except ValueError as e:
                 st.error(str(e))
+
+
+        # Nueva sección de diversidad de especies
+st.header("🌿 Diversidad de Especies")
+try:
+    shannon_df = calculate_shannon_index(df_clean)
+    
+    # Mostrar métricas rápidas
+    max_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmax()]
+    min_diversity = shannon_df.loc[shannon_df['SHANNON_INDEX'].idxmin()]
+    
+    cols = st.columns(3)
+    cols[0].metric("Valor Máximo", 
+                  f"{max_diversity['SHANNON_INDEX']:.2f}", 
+                  max_diversity['DPTO'])
+    cols[1].metric("Valor Mínimo", 
+                  f"{min_diversity['SHANNON_INDEX']:.2f}", 
+                  min_diversity['DPTO'])
+    cols[2].metric("Promedio Nacional", 
+                  f"{shannon_df['SHANNON_INDEX'].mean():.2f}")
+    
+    # Mostrar gráfico y datos
+    fig_shannon = plot_shannon_diversity(shannon_df)
+    st.plotly_chart(fig_shannon, use_container_width=True)
+    
+    with st.expander("🔍 Ver datos detallados de diversidad"):
+        st.dataframe(shannon_df.style.format({'SHANNON_INDEX': '{:.2f}'}))
+        
+        # Botón de descarga
+        csv = shannon_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Descargar índices de diversidad",
+            csv,
+            "indices_diversidad.csv",
+            "text/csv",
+            key='download-diversity'
+        )
+        
+except ValueError as e:
+    st.error(str(e))
                 
         
         except Exception as e:
