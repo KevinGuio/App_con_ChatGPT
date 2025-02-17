@@ -55,9 +55,33 @@ def handle_missing_values(df):
     return df_filled
 
 
+def get_top_species(df):
+    """Identifica las 10 especies más comunes y sus volúmenes por departamento.
+
+    Args:
+        df (pd.DataFrame): DataFrame con los datos procesados
+
+    Returns:
+        pd.DataFrame: DataFrame con ranking de especies por departamento
+    """
+    # Verificar existencia de columnas requeridas
+    required_columns = {'DPTO', 'ESPECIE', 'VOLUMEN M3'}
+    if not required_columns.issubset(df.columns):
+        raise ValueError("El dataset no contiene las columnas requeridas")
+    
+    # Agrupar y sumar volúmenes
+    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=True)['VOLUMEN M3'].sum().reset_index()
+    
+    # Ordenar y seleccionar top 10 por departamento
+    grouped['Rank'] = grouped.groupby('DPTO')['VOLUMEN M3'].rank(method='dense', ascending=False)
+    top_species = grouped[grouped['Rank'] <= 10].sort_values(['DPTO', 'Rank'])
+    
+    return top_species.drop(columns='Rank').reset_index(drop=True)
+
+
 def main():
     """Función principal para la aplicación Streamlit."""
-    st.title("Interpolación Automática de Valores Faltantes")
+    st.title("Análisis de Producción Maderera")
 
     # Sección de carga de datos
     st.header("Carga de Datos")
@@ -81,7 +105,7 @@ def main():
         try:
             df_clean = handle_missing_values(df)
             
-            # Mostrar resultados
+            # Mostrar resultados limpieza
             st.header("Datos Procesados")
             st.dataframe(df_clean)
 
@@ -97,6 +121,28 @@ def main():
             with col2:
                 st.write("Valores faltantes después de interpolación:")
                 st.write(cleaned_nulls)
+
+            # Nueva funcionalidad: Top especies
+            st.header("Análisis de Especies por Departamento")
+            
+            try:
+                top_species = get_top_species(df_clean)
+                
+                st.subheader("Top 10 Especies por Volumen y Departamento")
+                st.dataframe(top_species)
+                
+                # Mostrar métricas resumidas
+                total_volume = top_species['VOLUMEN M3'].sum()
+                avg_volume = top_species['VOLUMEN M3'].mean()
+                total_species = top_species['ESPECIE'].nunique()
+                
+                cols = st.columns(3)
+                cols[0].metric("Volumen Total (m³)", f"{total_volume:,.2f}")
+                cols[1].metric("Promedio por Especie", f"{avg_volume:,.2f}")
+                cols[2].metric("Especies Únicas", total_species)
+                
+            except ValueError as e:
+                st.warning(str(e))
 
         except Exception as e:
             st.error(f"Error en procesamiento: {str(e)}")
