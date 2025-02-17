@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import geopandas as gpd
+import pydeck as pdk
+from unidecode import unidecode
 
 def load_data(uploaded_file=None, url=None):
     """Carga datos desde un archivo CSV subido o una URL.
@@ -109,6 +112,82 @@ def plot_top_10_species(df):
     
     return fig
 
+
+def handle_missing_values(df):
+    """Rellena valores faltantes usando interpolación vectorizada."""
+    df_filled = df.copy()
+    numeric_cols = df_filled.select_dtypes(include=np.number).columns
+    
+    integer_cols = df_filled[numeric_cols].select_dtypes(include='integer').columns
+    float_cols = df_filled[numeric_cols].select_dtypes(include='float').columns
+    
+    if not integer_cols.empty:
+        df_filled[integer_cols] = df_filled[integer_cols].interpolate(method='nearest')
+    if not float_cols.empty:
+        df_filled[float_cols] = df_filled[float_cols].interpolate(method='linear')
+    
+    return df_filled
+
+def prepare_geo_data(df):
+    """Prepara los datos geográficos y los fusiona con los datos de volumen."""
+    # Cargar dataset geográfico
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/refs/heads/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_df = pd.read_csv(geo_url)
+    
+    # Normalizar nombres para hacer el merge
+    df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
+    df['MUNICIPIO'] = df['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
+    
+    geo_df['departamento'] = geo_df['departamento'].apply(lambda x: unidecode(x).upper().strip())
+    geo_df['municipio'] = geo_df['municipio'].apply(lambda x: unidecode(x).upper().strip())
+    
+    # Calcular volumen total por departamento
+    volume_by_dept = df.groupby('DPTO')['VOLUMEN M3'].sum().reset_index()
+    
+    # Fusionar datos geográficos con volúmenes
+    merged = geo_df.merge(volume_by_dept, 
+                        left_on='departamento',
+                        right_on='DPTO',
+                        how='inner')
+    
+    # Crear GeoDataFrame
+    gdf = gpd.GeoDataFrame(
+        merged,
+        geometry=gpd.points_from_xy(merged.longitud, merged.latitud)
+    )
+    
+    return gdf
+
+def create_heatmap(gdf):
+    """Crea un mapa de calor interactivo usando PyDeck."""
+    layer = pdk.Layer(
+        "HeatmapLayer",
+        data=gdf,
+        get_position=["longitud", "latitud"],
+        get_weight="VOLUMEN M3",
+        opacity=0.8,
+        threshold=0.05,
+        pickable=True
+    )
+    
+    view_state = pdk.ViewState(
+        latitude=4.5709,  # Centro de Colombia
+        longitude=-74.2973,
+        zoom=5,
+        pitch=40.5,
+        bearing=-27.36
+    )
+    
+    return pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={
+            "html": "<b>Departamento:</b> {departamento}<br><b>Volumen:</b> {VOLUMEN M3} m³",
+            "style": {"backgroundColor": "steelblue", "color": "white"}
+        }
+    )
+
+
 def main():
     """Función principal para la aplicación Streamlit."""
     st.title("Análisis de Producción Maderera")
@@ -186,6 +265,24 @@ def main():
 
         except Exception as e:
             st.error(f"Error en procesamiento: {str(e)}")
+
+    if df is not None:
+            # Procesamiento de datos
+            df_clean = handle_missing_values(df)
+            
+            # Sección de mapa de calor
+            st.header("Mapa de Calor de Volúmenes por Departamento")
+            try:
+                gdf = prepare_geo_data(df_clean)
+                heatmap = create_heatmap(gdf)
+                st.pydeck_chart(heatmap)
+                
+                # Mostrar datos subyacentes
+                with st.expander("Ver datos geográficos procesados"):
+                    st.dataframe(gdf[['departamento', 'municipio', 'VOLUMEN M3']])
+                    
+            except Exception as e:
+                st.error(f"Error generando mapa: {str(e)}")
 
 if __name__ == "__main__":
     main()
