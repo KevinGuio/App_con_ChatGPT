@@ -21,9 +21,16 @@ def load_data(uploaded_file=None, url=None):
         # Normalizar nombres de columnas
         df.columns = [unidecode(col).strip().upper().replace(' ', '_') for col in df.columns]
 
-        # Corrección específica para la columna ANO -> AÑO
-        if 'ANO' in df.columns:
-            df = df.rename(columns={'ANO': 'AÑO'})
+        # Correcciones específicas de nombres
+        rename_pairs = [
+            ('ANO', 'AÑO'),
+            ('DEPARTAMENTO', 'DPTO'),  # Nueva línea clave
+            ('DEPT', 'DPTO')           # Otras posibles variantes
+        ]
+        
+        for old_name, new_name in rename_pairs:
+            if old_name in df.columns and new_name not in df.columns:
+                df = df.rename(columns={old_name: new_name})
             
         return df.copy()
     
