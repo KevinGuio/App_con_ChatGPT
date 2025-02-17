@@ -159,13 +159,13 @@ def get_temporal_evolution(df):
     df = df.copy()
     
     # Verificar columnas requeridas
-    required = {'AÑO', 'ESPECIE', 'TIPO_PRODUCTO', 'VOLUMEN_M3'}
+    required = {'ANO', 'ESPECIE', 'TIPO_PRODUCTO', 'VOLUMEN_M3'}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
     
     # Agrupar y sumar volúmenes
-    evolution = df.groupby(['AÑO', 'ESPECIE', 'TIPO_PRODUCTO'], observed=False)\
+    evolution = df.groupby(['ANO', 'ESPECIE', 'TIPO_PRODUCTO'], observed=False)\
                 .agg(VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum'))\
                 .reset_index()
     
