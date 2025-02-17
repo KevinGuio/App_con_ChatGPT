@@ -17,6 +17,11 @@ def load_data(uploaded_file=None, url=None):
         
         # Normalizar nombres de columnas
         df.columns = [unidecode(col).strip().upper().replace(' ', '_') for col in df.columns]
+
+        # Corrección específica para la columna ANO -> AÑO
+        if 'ANO' in df.columns:
+            df = df.rename(columns={'ANO': 'AÑO'})
+            
         return df.copy()
     
     except Exception as e:
@@ -159,13 +164,13 @@ def get_temporal_evolution(df):
     df = df.copy()
     
     # Verificar columnas requeridas
-    required = {'ANO', 'ESPECIE', 'TIPO_PRODUCTO', 'VOLUMEN_M3'}
+    required = {'AÑO', 'ESPECIE', 'TIPO_PRODUCTO', 'VOLUMEN_M3'}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
     
     # Agrupar y sumar volúmenes
-    evolution = df.groupby(['ANO', 'ESPECIE', 'TIPO_PRODUCTO'], observed=False)\
+    evolution = df.groupby(['AÑO', 'ESPECIE', 'TIPO_PRODUCTO'], observed=False)\
                 .agg(VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum'))\
                 .reset_index()
     
@@ -292,7 +297,7 @@ def main():
                 
                 # Mostrar métricas
                 total_volume = filtered_data['VOLUMEN_TOTAL'].sum()
-                year_range = f"{filtered_data['ANO'].min()} - {filtered_data['ANO'].max()}"
+                year_range = f"{filtered_data['AÑO'].min()} - {filtered_data['AÑO'].max()}"
                 
                 st.metric("📦 Volumen Total en Período Seleccionado", 
                          f"{total_volume:,.0f} m³", 
@@ -304,7 +309,7 @@ def main():
                 
                 # Mostrar datos subyacentes
                 with st.expander("🔍 Ver datos detallados"):
-                    st.dataframe(filtered_data.sort_values(['ANO', 'VOLUMEN_TOTAL'], ascending=False))
+                    st.dataframe(filtered_data.sort_values(['AÑO', 'VOLUMEN_TOTAL'], ascending=False))
                 
             except ValueError as e:
                 st.error(str(e))
