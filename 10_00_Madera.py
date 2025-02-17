@@ -418,7 +418,6 @@ def prepare_geo_data(df):
         # Cargar dataset geográfico
         geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
         geo_df = pd.read_csv(geo_url)
-        df = df.copy()
         
         # Normalizar nombres
         df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
