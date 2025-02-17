@@ -549,7 +549,101 @@ def plot_shannon_diversity(shannon_df):
         height=500
     )
     return fig
-  
+
+
+def load_region_mapping():
+    """Carga un mapeo predeterminado de departamentos a regiones."""
+    # Mapeo de ejemplo (debes adaptarlo a tu país)
+    default_regions = {
+        'REGION': ['CARIBE', 'ANDINA', 'PACIFICO', 'ORINOQUIA', 'AMAZONIA'],
+        'DPTOS': [
+            ['ATLANTICO', 'BOLIVAR', 'CESAR', 'CORDOBA', 'MAGDALENA', 'SUCRE', 'LA GUAJIRA'],
+            ['ANTIOQUIA', 'BOYACA', 'CUNDINAMARCA', 'HUILA', 'TOLIMA', 'SANTANDER'],
+            ['CAUCA', 'CHOCO', 'NARIÑO', 'VALLE DEL CAUCA'],
+            ['ARAUCA', 'CASANARE', 'META', 'VICHADA'],
+            ['AMAZONAS', 'GUAINIA', 'GUAVIARE', 'PUTUMAYO', 'VAUPES']
+        ]
+    }
+    return pd.DataFrame(default_regions).explode('DPTOS')
+
+def calculate_regional_diversity(df, region_mapping):
+    """Calcula la diversidad por región usando el mapeo proporcionado."""
+    # Normalizar nombres de departamentos
+    df = df.copy()
+    df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
+    region_mapping['DPTOS'] = region_mapping['DPTOS'].apply(lambda x: unidecode(x).upper().strip())
+    
+    # Fusionar datos con mapeo regional
+    merged = df.merge(region_mapping, left_on='DPTO', right_on='DPTOS', how='left')
+    
+    # Validar datos faltantes
+    missing = merged[merged['REGION'].isna()]['DPTO'].unique()
+    if len(missing) > 0:
+        raise ValueError(f"Departamentos sin región asignada: {', '.join(missing)}")
+    
+    # Calcular índice de Shannon por región
+    grouped = merged.groupby(['REGION', 'ESPECIE'], observed=False)['VOLUMEN_M3'].sum().reset_index()
+    total_por_region = grouped.groupby('REGION', observed=False)['VOLUMEN_M3'].transform('sum')
+    grouped['PROPORCION'] = grouped['VOLUMEN_M3'] / total_por_region
+    
+    grouped['SHANNON_TERM'] = grouped['PROPORCION'] * np.log(grouped['PROPORCION'])
+    
+    shannon_df = grouped.groupby('REGION', observed=False).agg(
+        SHANNON_INDEX=('SHANNON_TERM', lambda x: -x.sum()),
+        TOTAL_ESPECIES=('ESPECIE', 'nunique'),
+        VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum')
+    ).reset_index()
+    
+    return shannon_df.sort_values('SHANNON_INDEX', ascending=False)
+
+def plot_regional_comparison(shannon_df):
+    """Crea visualización comparativa de diversidad regional."""
+    fig = px.bar(shannon_df,
+                 x='REGION',
+                 y='SHANNON_INDEX',
+                 color='TOTAL_ESPECIES',
+                 title='Comparación de Diversidad entre Regiones',
+                 labels={
+                     'SHANNON_INDEX': 'Índice de Shannon',
+                     'REGION': 'Región',
+                     'TOTAL_ESPECIES': 'N° de Especies'
+                 },
+                 hover_data=['VOLUMEN_TOTAL'],
+                 color_continuous_scale='Viridis')
+    
+    fig.update_layout(
+        xaxis={'categoryorder': 'total descending'},
+        hovermode='closest',
+        height=600
+    )
+    return fig
+
+def plot_regional_map(shannon_df, geo_data):
+    """Muestra las regiones en un mapa con escala de diversidad."""
+    # Agrupar datos geográficos por región
+    region_geo = geo_data.groupby('REGION', observed=False).agg({
+        'LATITUD': 'mean',
+        'LONGITUD': 'mean'
+    }).reset_index()
+    
+    merged = region_geo.merge(shannon_df, on='REGION')
+    
+    fig = px.scatter_mapbox(merged,
+                          lat='LATITUD',
+                          lon='LONGITUD',
+                          size='SHANNON_INDEX',
+                          color='SHANNON_INDEX',
+                          hover_name='REGION',
+                          hover_data=['TOTAL_ESPECIES', 'VOLUMEN_TOTAL'],
+                          zoom=4,
+                          height=600,
+                          color_continuous_scale='temps',
+                          title='Distribución Geográfica de la Diversidad')
+    
+    fig.update_layout(mapbox_style="carto-positron",
+                    margin={"r":0,"t":40,"l":0,"b":0})
+    return fig
+
 
 def main():
     st.title("🌳 Análisis de Producción Maderera")
@@ -969,6 +1063,64 @@ def main():
                     
             except ValueError as e:
                 st.error(str(e))
+
+                        # Nueva sección de comparación regional
+            st.header("🌐 Comparación entre Regiones")
+            try:
+                # Cargar o definir regiones
+                st.subheader("Configuración Regional")
+                region_file = st.file_uploader("Subir mapeo de regiones (CSV con columnas: REGION, DPTOS)", 
+                                             type='csv')
+                
+                if region_file:
+                    region_mapping = pd.read_csv(region_file)
+                else:
+                    st.info("Usando mapeo regional predeterminado")
+                    region_mapping = load_region_mapping()
+                
+                # Calcular y mostrar resultados
+                regional_diversity = calculate_regional_diversity(df_clean, region_mapping)
+                
+                cols = st.columns(2)
+                cols[0].metric("Región más diversa", 
+                              f"{regional_diversity.iloc[0]['REGION']} ({regional_diversity.iloc[0]['SHANNON_INDEX']:.2f})")
+                cols[1].metric("Región menos diversa", 
+                              f"{regional_diversity.iloc[-1]['REGION']} ({regional_diversity.iloc[-1]['SHANNON_INDEX']:.2f})")
+                
+                # Gráficos
+                fig_region = plot_regional_comparison(regional_diversity)
+                st.plotly_chart(fig_region, use_container_width=True)
+                
+                # Mapa regional (requiere datos geográficos)
+                try:
+                    geo_data = prepare_geo_data(df_clean)
+                    if 'REGION' in geo_data.columns:
+                        fig_region_map = plot_regional_map(regional_diversity, geo_data)
+                        st.plotly_chart(fig_region_map, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"No se pudo generar el mapa regional: {str(e)}")
+                
+                # Datos detallados
+                with st.expander("📋 Ver análisis regional completo"):
+                    st.dataframe(regional_diversity.style.format({
+                        'SHANNON_INDEX': '{:.2f}',
+                        'VOLUMEN_TOTAL': '{:,.0f} m³'
+                    }))
+                    
+                    # Descarga
+                    csv = regional_diversity.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Descargar datos regionales",
+                        csv,
+                        "analisis_regional.csv",
+                        "text/csv",
+                        key='download-regional'
+                    )
+            
+            except ValueError as e:
+                st.error(str(e))
+            except Exception as e:
+                st.error(f"Error en análisis regional: {str(e)}")
 
                 
         
