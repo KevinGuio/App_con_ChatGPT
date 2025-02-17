@@ -552,20 +552,20 @@ def plot_shannon_diversity(shannon_df):
 
 
 def load_region_mapping():
-    """Carga el mapeo oficial de regiones desde GitHub"""
+    """Carga el mapeo oficial con normalización robusta"""
     try:
         url = "https://raw.githubusercontent.com/MrHuman19/Proyecto-base-de-datos/main/Departamentos_y_municipios_de_Colombia.csv"
         region_mapping = pd.read_csv(url, sep=';', encoding='utf-8')
         
-        # Normalizar nombres
-        region_mapping = region_mapping[['REGION', 'DEPARTAMENTO']].drop_duplicates()
-        region_mapping['DPTOS'] = region_mapping['DEPARTAMENTO'].apply(
-            lambda x: unidecode(x).upper().strip()
+        # Normalización consistente
+        region_mapping['DPTOS_NORM'] = (
+            region_mapping['DEPARTAMENTO']
+            .apply(lambda x: unidecode(x).upper().strip()
+            .str.replace(r'[^A-Z]', '', regex=True)
         )
-        region_mapping = region_mapping[['REGION', 'DPTOS']]
         
-        return region_mapping
-    
+        return region_mapping[['REGION', 'DPTOS_NORM']].rename(columns={'DPTOS_NORM': 'DPTOS'})
+        
     except Exception as e:
         st.warning(f"No se pudo cargar el mapeo oficial: {str(e)}")
         # Fallback a mapeo básico
