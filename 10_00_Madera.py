@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 
 def load_data(uploaded_file=None, url=None):
@@ -27,25 +28,36 @@ def load_data(uploaded_file=None, url=None):
         raise Exception(f"Error cargando datos: {str(e)}") from e
 
 
-def handle_missing_values(df, numeric_cols, method):
-    """Rellena valores faltantes usando interpolación vectorizada.
+def handle_missing_values(df):
+    """Rellena valores faltantes usando interpolación según tipo de dato de la columna.
 
     Args:
         df (pd.DataFrame): DataFrame original con datos faltantes.
-        numeric_cols (list): Lista de columnas numéricas a procesar.
-        method (str): Método de interpolación a utilizar.
 
     Returns:
         pd.DataFrame: DataFrame con valores faltantes interpolados.
     """
     df_filled = df.copy()
-    df_filled[numeric_cols] = df_filled[numeric_cols].interpolate(method=method)
+    
+    # Detectar columnas numéricas
+    numeric_cols = df_filled.select_dtypes(include=np.number).columns
+    
+    # Separar columnas enteras y decimales
+    integer_cols = df_filled[numeric_cols].select_dtypes(include='integer').columns
+    float_cols = df_filled[numeric_cols].select_dtypes(include='float').columns
+    
+    # Aplicar interpolación específica por tipo de dato
+    if not integer_cols.empty:
+        df_filled[integer_cols] = df_filled[integer_cols].interpolate(method='nearest')
+    if not float_cols.empty:
+        df_filled[float_cols] = df_filled[float_cols].interpolate(method='linear')
+    
     return df_filled
 
 
 def main():
     """Función principal para la aplicación Streamlit."""
-    st.title("Interpolación de Valores Faltantes")
+    st.title("Interpolación Automática de Valores Faltantes")
 
     # Sección de carga de datos
     st.header("Carga de Datos")
@@ -65,55 +77,29 @@ def main():
         st.header("Datos Originales")
         st.dataframe(df)
 
-        # Detectar columnas numéricas
-        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        # Procesamiento automático
+        try:
+            df_clean = handle_missing_values(df)
+            
+            # Mostrar resultados
+            st.header("Datos Procesados")
+            st.dataframe(df_clean)
 
-        if not numeric_cols:
-            st.warning("No se encontraron columnas numéricas en el dataset")
-        else:
-            # Selección de parámetros de interpolación
-            st.header("Parámetros de Interpolación")
-            selected_cols = st.multiselect(
-                "Columnas a interpolar", options=numeric_cols
-            )
+            # Comparativa de valores faltantes
+            st.subheader("Resumen de Valores Faltantes")
+            original_nulls = df.select_dtypes(include=np.number).isnull().sum()
+            cleaned_nulls = df_clean.select_dtypes(include=np.number).isnull().sum()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("Valores faltantes originales:")
+                st.write(original_nulls)
+            with col2:
+                st.write("Valores faltantes después de interpolación:")
+                st.write(cleaned_nulls)
 
-            method = st.selectbox(
-                "Método de interpolación",
-                options=[
-                    "linear",
-                    "time",
-                    "index",
-                    "nearest",
-                    "zero",
-                    "slinear",
-                    "quadratic",
-                    "cubic",
-                ],
-            )
-
-            if selected_cols and method:
-                # Aplicar interpolación
-                try:
-                    df_clean = handle_missing_values(df, selected_cols, method)
-                    
-                    # Mostrar resultados
-                    st.header("Datos Procesados")
-                    st.dataframe(df_clean)
-
-                    # Comparativa de valores faltantes
-                    st.subheader("Resumen de Valores Faltantes")
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("Original:")
-                        st.write(df[selected_cols].isnull().sum())
-                    
-                    with col2:
-                        st.write("Procesado:")
-                        st.write(df_clean[selected_cols].isnull().sum())
-
-                except Exception as e:
-                    st.error(f"Error en interpolación: {str(e)}")
+        except Exception as e:
+            st.error(f"Error en procesamiento: {str(e)}")
 
 
 if __name__ == "__main__":
