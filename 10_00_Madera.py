@@ -102,6 +102,58 @@ def create_heatmap(df):
     fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
     return fig
 
+
+def get_top_municipalities(df):
+    """Identifica los 10 municipios con mayor volumen movilizado."""
+    df = df.copy()
+    
+    # Verificar columnas requeridas
+    required = {'DPTO', 'MUNICIPIO', 'VOLUMEN_M3'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
+    
+    # Agrupar y sumar volúmenes
+    top_municipios = df.groupby(['DPTO', 'MUNICIPIO'], observed=False, as_index=False)\
+                      .agg(VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum'))\
+                      .nlargest(10, 'VOLUMEN_TOTAL')
+    
+    return top_municipios
+
+def plot_municipality_map(df):
+    """Crea mapa interactivo de los municipios con mayor movilización."""
+    # Cargar datos geográficos
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_df = pd.read_csv(geo_url)
+    
+    # Normalizar nombres
+    df['MUNICIPIO'] = df['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
+    geo_df['NOM_MPIO'] = geo_df['NOM_MPIO'].apply(lambda x: unidecode(x).upper().strip())
+    
+    # Fusionar datos
+    merged = geo_df.merge(df, 
+                        left_on=['NOM_DPTO', 'NOM_MPIO'],
+                        right_on=['DPTO', 'MUNICIPIO'],
+                        how='inner')
+    
+    # Crear mapa interactivo
+    fig = px.scatter_mapbox(merged,
+                           lat='LATITUD',
+                           lon='LONGITUD',
+                           size='VOLUMEN_TOTAL',
+                           color='VOLUMEN_TOTAL',
+                           hover_name='NOM_MPIO',
+                           hover_data={'DPTO': True, 'VOLUMEN_TOTAL': ':.2f'},
+                           zoom=4.5,
+                           height=600,
+                           color_continuous_scale=px.colors.sequential.Viridis,
+                           title='Top 10 Municipios con Mayor Movilización de Madera')
+    
+    fig.update_layout(mapbox_style="carto-positron",
+                    margin={"r":0,"t":40,"l":0,"b":0})
+    return fig
+
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -157,6 +209,24 @@ def main():
                 
             except Exception as e:
                 st.error(f"Error en el mapa: {str(e)}")
+
+            st.header("🏙️ Top 10 Municipios")
+            try:
+                top_municipios = get_top_municipalities(df_clean)
+                
+                # Mostrar métricas
+                cols = st.columns(3)
+                cols[0].metric("📦 Volumen Total", f"{top_municipios['VOLUMEN_TOTAL'].sum():,.0f} m³")
+                cols[1].metric("📍 Municipios Únicos", top_municipios['MUNICIPIO'].nunique())
+                cols[2].metric("🗺️ Departamentos", top_municipios['DPTO'].nunique())
+                
+                # Mostrar tabla y mapa
+                st.dataframe(top_municipios.sort_values('VOLUMEN_TOTAL', ascending=False))
+                fig_municipios = plot_municipality_map(top_municipios)
+                st.plotly_chart(fig_municipios, use_container_width=True)
+                
+            except ValueError as e:
+                st.error(str(e))
             
         except Exception as e:
             st.error(f"🚨 Error general: {str(e)}")
