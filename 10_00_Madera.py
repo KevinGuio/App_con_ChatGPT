@@ -129,63 +129,71 @@ def handle_missing_values(df):
     return df_filled
 
 
+# Función para preparar datos geoespaciales
 def prepare_geo_data(df):
-    """Prepara los datos geográficos y los fusiona con los datos de volumen."""
+    """Prepara y fusiona datos de volumen con geometrías municipales."""
     # Cargar dataset geográfico
-    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/refs/heads/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
     geo_df = pd.read_csv(geo_url)
     
-    # Normalizar nombres para hacer el merge
+    # Normalización de nombres
     df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
     geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
     
-    # Calcular volumen total por departamento
+    # Calcular volumen por departamento
     volume_by_dept = df.groupby('DPTO')['VOLUMEN M3'].sum().reset_index()
     
-    # Fusionar datos geográficos con volúmenes
+    # Fusionar datos
     merged = geo_df.merge(volume_by_dept, 
                         left_on='NOM_DPTO',
                         right_on='DPTO',
                         how='inner')
     
-    # Crear GeoDataFrame con las coordenadas correctas
-    gdf = gpd.GeoDataFrame(
+    # Crear GeoDataFrame
+    return gpd.GeoDataFrame(
         merged,
         geometry=gpd.points_from_xy(merged.LONGITUD, merged.LATITUD)
     )
+
+# Función para crear el mapa interactivo
+def create_colombia_heatmap(gdf):
+    """Genera mapa de calor interactivo para Colombia."""
+    # Capa del mapa base
+    colombia = load_colombia_base_map()
     
-    return gdf
-
-
-def create_heatmap(gdf):
-    """Crea un mapa de calor interactivo usando PyDeck."""
-    layer = pdk.Layer(
+    # Capa de calor
+    heatmap_layer = pdk.Layer(
         "HeatmapLayer",
         data=gdf,
         get_position=["LONGITUD", "LATITUD"],
         get_weight="VOLUMEN M3",
-        opacity=0.8,
+        opacity=0.7,
         threshold=0.05,
+        radius_pixels=30,
         pickable=True
     )
     
+    # Configuración de vista
     view_state = pdk.ViewState(
-        latitude=4.5709,
+        latitude=4.5709,  # Centro geográfico de Colombia
         longitude=-74.2973,
-        zoom=5,
-        pitch=40.5,
-        bearing=-27.36
+        zoom=4.5,
+        pitch=40
     )
     
+    # Tooltip interactivo
+    tooltip = {
+        "html": "<b>Departamento:</b> {NOM_DPTO}<br><b>Volumen:</b> {VOLUMEN_M3} m³",
+        "style": {"backgroundColor": "steelblue", "color": "white"}
+    }
+    
+    # Crear mapa combinado
     return pdk.Deck(
-        layers=[layer],
+        layers=[heatmap_layer],
         initial_view_state=view_state,
-        tooltip={
-            "html": "<b>Departamento:</b> {NOM_DPTO}<br><b>Volumen:</b> {VOLUMEN M3} m³",
-            "style": {"backgroundColor": "steelblue", "color": "white"}
-        }
+        tooltip=tooltip,
+        map_style='light'
     )
-
 
 def main():
     """Función principal para la aplicación Streamlit."""
@@ -265,23 +273,24 @@ def main():
         except Exception as e:
             st.error(f"Error en procesamiento: {str(e)}")
 
-    if df is not None:
-            # Procesamiento de datos
+    if uploaded_file or url:
+        try:
+            # Cargar y procesar datos
+            df = load_data(uploaded_file, url)
             df_clean = handle_missing_values(df)
+            gdf = prepare_geo_data(df_clean)
             
-            # Sección de mapa de calor
-            st.header("Mapa de Calor de Volúmenes por Departamento")
-            try:
-                gdf = prepare_geo_data(df_clean)
-                heatmap = create_heatmap(gdf)
-                st.pydeck_chart(heatmap)
+            # Mostrar mapa
+            st.header("Mapa de Calor por Volumen Maderero")
+            heatmap = create_colombia_heatmap(gdf)
+            st.pydeck_chart(heatmap)
+            
+            # Mostrar datos subyacentes
+            with st.expander("Ver datos geoespaciales procesados"):
+                st.dataframe(gdf[['NOM_DPTO', 'NOM_MPIO', 'VOLUMEN M3']])
                 
-                # Mostrar datos subyacentes
-                with st.expander("Ver datos geográficos procesados"):
-                    st.dataframe(gdf[['NOM_DPTO', 'NOM_MPIO', 'VOLUMEN M3']])
-                    
-            except Exception as e:
-                st.error(f"Error generando mapa: {str(e)}")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
 
 if __name__ == "__main__":
     main()
