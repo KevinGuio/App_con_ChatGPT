@@ -2,150 +2,128 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import geopandas as gpd
-import matplotlib.pyplot as plt
-import pydeck as pdk
+import plotly.express as px
 from unidecode import unidecode
 
 def load_data(uploaded_file=None, url=None):
-    """Carga datos desde un archivo CSV subido o una URL."""
+    """Carga y normaliza datos desde CSV."""
     try:
         if uploaded_file is not None:
-            return pd.read_csv(uploaded_file).copy()
-        if url:
-            return pd.read_csv(url).copy()
-        raise ValueError("Debe proporcionar un archivo o URL")
+            df = pd.read_csv(uploaded_file)
+        elif url:
+            df = pd.read_csv(url)
+        else:
+            raise ValueError("Debe proporcionar un archivo o URL")
+        
+        # Normalizar nombres de columnas
+        df.columns = [unidecode(col).strip().upper().replace(' ', '_') for col in df.columns]
+        return df.copy()
+    
     except Exception as e:
         raise Exception(f"Error cargando datos: {str(e)}") from e
 
 def handle_missing_values(df):
-    """Rellena valores faltantes usando interpolación vectorizada."""
-    df_filled = df.copy()
-    numeric_cols = df_filled.select_dtypes(include=np.number).columns
+    """Interpolación segura con copias explícitas."""
+    df = df.copy()
+    numeric_cols = df.select_dtypes(include=np.number).columns
     
-    integer_cols = df_filled[numeric_cols].select_dtypes(include='integer').columns
-    float_cols = df_filled[numeric_cols].select_dtypes(include='float').columns
+    # Crear copias independientes de las columnas
+    for col in numeric_cols:
+        df[col] = df[col].interpolate(method='nearest' if np.issubdtype(df[col].dtype, np.integer) else 'linear').copy()
     
-    if not integer_cols.empty:
-        df_filled[integer_cols] = df_filled[integer_cols].interpolate(method='nearest').copy()
-    if not float_cols.empty:
-        df_filled[float_cols] = df_filled[float_cols].interpolate(method='linear').copy()
-    
-    return df_filled
+    return df
 
 def get_top_species(df):
-    """Identifica las 5 especies más comunes y sus volúmenes por departamento."""
+    """Identifica top 5 especies con validación de columnas."""
     df = df.copy()
-    required_columns = {'DPTO', 'ESPECIE', 'VOLUMEN M3'}
-    if not required_columns.issubset(df.columns):
-        raise ValueError("El dataset no contiene las columnas requeridas")
+    required = {'DPTO', 'ESPECIE', 'VOLUMEN_M3'}
     
-    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=True)['VOLUMEN M3']\
-                .sum()\
-                .reset_index()\
-                .copy()
+    # Verificar existencia de columnas normalizadas
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
     
-    grouped['Rank'] = grouped.groupby('DPTO')['VOLUMEN M3']\
-                            .rank(method='dense', ascending=False)
-    top_species = grouped[grouped['Rank'] <= 5]\
-                    .sort_values(['DPTO', 'Rank'])\
-                    .reset_index(drop=True)\
-                    .copy()
+    # Agrupar con operaciones vectorizadas
+    grouped = df.groupby(['DPTO', 'ESPECIE'], observed=False, as_index=False).agg(
+        VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum')
+    )
     
-    return top_species.drop(columns='Rank')
+    # Filtrar top 5 por departamento
+    grouped['RANK'] = grouped.groupby('DPTO')['VOLUMEN_TOTAL'].rank(ascending=False, method='dense')
+    return grouped[grouped['RANK'] <= 5].sort_values(['DPTO', 'RANK']).drop(columns='RANK')
 
-def prepare_geo_data(df):
-    """Prepara y fusiona datos de volumen con geometrías municipales."""
-    df = df.copy()
+def create_heatmap(df):
+    """Crea mapa de calor con Plotly Express."""
+    # Cargar datos geográficos
     geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
-    geo_df = pd.read_csv(geo_url).copy()
+    geo_df = pd.read_csv(geo_url)
     
-    # Normalización de nombres
+    # Normalizar nombres en ambos datasets
     df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
     geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
     
-    # Calcular volumen por departamento
-    volume_by_dept = df.groupby('DPTO')['VOLUMEN M3'].sum().reset_index().copy()
+    # Calcular centroides por departamento
+    dept_volumes = df.groupby('DPTO', observed=False)['VOLUMEN_M3'].sum().reset_index()
+    merged = geo_df.merge(dept_volumes, left_on='NOM_DPTO', right_on='DPTO')
     
-    # Fusionar datos
-    merged = geo_df.merge(volume_by_dept, 
-                        left_on='NOM_DPTO',
-                        right_on='DPTO',
-                        how='inner').copy()
-    
-    # Crear GeoDataFrame
-    return gpd.GeoDataFrame(
+    # Crear mapa interactivo
+    fig = px.density_mapbox(
         merged,
-        geometry=gpd.points_from_xy(merged.LONGITUD, merged.LATITUD)
-    ).copy()
-
-def create_colombia_heatmap(gdf):
-    """Genera mapa de calor interactivo para Colombia."""
-    gdf = gdf.copy()
-    heatmap_layer = pdk.Layer(
-        "HeatmapLayer",
-        data=gdf,
-        get_position=["LONGITUD", "LATITUD"],
-        get_weight="VOLUMEN M3",
-        opacity=0.7,
-        threshold=0.05,
-        radius_pixels=30,
-        pickable=True
+        lat='LATITUD',
+        lon='LONGITUD',
+        z='VOLUMEN_M3',
+        hover_name='NOM_DPTO',
+        radius=20,
+        zoom=4,
+        mapbox_style="carto-positron",
+        title='Distribución de Volúmenes por Departamento'
     )
     
-    view_state = pdk.ViewState(
-        latitude=4.5709,
-        longitude=-74.2973,
-        zoom=4.5,
-        pitch=40
-    )
-    
-    tooltip = {
-        "html": "<b>Departamento:</b> {NOM_DPTO}<br><b>Volumen:</b> {VOLUMEN M3} m³",
-        "style": {"backgroundColor": "steelblue", "color": "white"}
-    }
-    
-    return pdk.Deck(
-        layers=[heatmap_layer],
-        initial_view_state=view_state,
-        tooltip=tooltip,
-        map_style='light'
-    )
+    fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
+    return fig
 
 def main():
-    """Función principal para la aplicación Streamlit."""
-    st.title("Análisis de Producción Maderera")
-
-    # Sección de carga de datos
+    st.title("🌳 Análisis de Producción Maderera")
+    
+    # Carga de datos
     uploaded_file = st.file_uploader("Subir archivo CSV", type="csv")
     url = st.text_input("O ingresar URL de datos CSV")
-
-    df = None
+    
     if uploaded_file or url:
         try:
+            # Procesamiento inicial
             df = load_data(uploaded_file, url)
             df_clean = handle_missing_values(df)
             
-            # Mostrar datos originales y procesados
-            st.header("Datos Originales")
-            st.dataframe(df)
+            # Sección de datos
+            with st.expander("📥 Datos Originales"):
+                st.dataframe(df)
             
-            st.header("Datos Procesados")
-            st.dataframe(df_clean)
-
+            with st.expander("🧹 Datos Procesados"):
+                st.dataframe(df_clean)
+            
             # Análisis de especies
-            st.header("Análisis de Especies")
-            top_species = get_top_species(df_clean)
-            st.subheader("Top 5 Especies por Volumen y Departamento")
-            st.dataframe(top_species)
-
+            st.header("🔝 Top 5 Especies por Departamento")
+            try:
+                top_species = get_top_species(df_clean)
+                st.dataframe(top_species)
+                
+                # Métricas
+                cols = st.columns(3)
+                cols[0].metric("📦 Volumen Total", f"{top_species['VOLUMEN_TOTAL'].sum():,.0f} m³")
+                cols[1].metric("🌳 Especies Únicas", top_species['ESPECIE'].nunique())
+                cols[2].metric("🗺️ Departamentos", top_species['DPTO'].nunique())
+                
+            except ValueError as e:
+                st.error(str(e))
+            
             # Mapa de calor
-            st.header("Mapa de Calor por Volumen Maderero")
-            gdf = prepare_geo_data(df_clean)
-            heatmap = create_colombia_heatmap(gdf)
-            st.pydeck_chart(heatmap)
-
+            st.header("🌎 Mapa de Distribución")
+            fig = create_heatmap(df_clean)
+            st.plotly_chart(fig, use_container_width=True)
+            
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"🚨 Error: {str(e)}")
 
 if __name__ == "__main__":
     main()
