@@ -256,6 +256,63 @@ def plot_outliers(df, stats):
     return fig, fig2
 
 
+def calculate_municipality_volumes(df):
+    """Calcula el volumen total por municipio con geolocalización.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con datos procesados
+        
+    Returns:
+        pd.DataFrame: Datos agrupados con información geográfica
+    """
+    df = df.copy()
+    
+    # Verificar columnas requeridas
+    required = {'MUNICIPIO', 'DPTO', 'VOLUMEN_M3'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
+    
+    # Cargar datos geográficos
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_df = pd.read_csv(geo_url)
+    
+    # Normalizar nombres
+    df['MUNICIPIO'] = df['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
+    geo_df['NOM_MPIO'] = geo_df['NOM_MPIO'].apply(lambda x: unidecode(x).upper().strip())
+    
+    # Agrupar y sumar volúmenes
+    municipios = df.groupby(['DPTO', 'MUNICIPIO'], observed=False).agg(
+        VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum')
+    ).reset_index()
+    
+    # Fusionar con datos geográficos
+    merged = geo_df.merge(municipios, 
+                        left_on=['NOM_DPTO', 'NOM_MPIO'],
+                        right_on=['DPTO', 'MUNICIPIO'],
+                        how='right')
+    
+    return merged[['DPTO', 'MUNICIPIO', 'LATITUD', 'LONGITUD', 'VOLUMEN_TOTAL']]
+
+def plot_municipality_volumes(gdf):
+    """Crea visualización interactiva de volúmenes por municipio."""
+    fig = px.scatter_mapbox(gdf,
+                          lat='LATITUD',
+                          lon='LONGITUD',
+                          size='VOLUMEN_TOTAL',
+                          color='VOLUMEN_TOTAL',
+                          hover_name='MUNICIPIO',
+                          hover_data={'DPTO': True, 'VOLUMEN_TOTAL': ':.2f'},
+                          zoom=5,
+                          height=600,
+                          color_continuous_scale=px.colors.sequential.Viridis,
+                          title='Volumen de Madera por Municipio')
+    
+    fig.update_layout(mapbox_style="carto-positron",
+                    margin={"r":0,"t":40,"l":0,"b":0})
+    return fig
+
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -426,6 +483,57 @@ def main():
                 
             except ValueError as e:
                 st.error(str(e))
+
+        # Nueva sección de análisis por municipio
+            st.header("🏘️ Volumen por Municipio")
+            
+            try:
+                municipios_df = calculate_municipality_volumes(df_clean)
+                
+                # Mostrar métricas rápidas
+                cols = st.columns(3)
+                cols[0].metric("🗺️ Municipios Únicos", municipios_df['MUNICIPIO'].nunique())
+                cols[1].metric("📦 Volumen Total", f"{municipios_df['VOLUMEN_TOTAL'].sum():,.0f} m³")
+                cols[2].metric("📌 Municipio con Mayor Volumen", 
+                              municipios_df.loc[municipios_df['VOLUMEN_TOTAL'].idxmax(), 'MUNICIPIO'])
+                
+                # Selector de departamento
+                selected_dept = st.selectbox('Filtrar por Departamento:', 
+                                            options=['Todos'] + sorted(municipios_df['DPTO'].unique()))
+                
+                # Aplicar filtro
+                if selected_dept != 'Todos':
+                    filtered_df = municipios_df[municipios_df['DPTO'] == selected_dept]
+                else:
+                    filtered_df = municipios_df
+                
+                # Mostrar tabla interactiva
+                st.dataframe(filtered_df.sort_values('VOLUMEN_TOTAL', ascending=False),
+                            column_order=['DPTO', 'MUNICIPIO', 'VOLUMEN_TOTAL'],
+                            column_config={
+                                'VOLUMEN_TOTAL': st.column_config.NumberColumn(
+                                    format="%,.2f m³"
+                                )
+                            })
+                
+                # Visualización en mapa
+                st.subheader("Mapa de Calor por Municipio")
+                fig = plot_municipality_volumes(filtered_df)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Descarga de datos
+                csv = filtered_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Descargar datos por municipio",
+                    csv,
+                    "volumen_municipios.csv",
+                    "text/csv",
+                    key='download-municipios'
+                )
+                
+            except ValueError as e:
+                st.error(str(e))
+                
         
         except Exception as e:
             st.error(f"🚨 Error general: {str(e)}")
