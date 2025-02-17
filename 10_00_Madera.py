@@ -371,6 +371,45 @@ def plot_low_volume_distribution(gdf):
     return fig
 
 
+def compare_species_distribution(df):
+    """Compara la distribución de especies entre departamentos."""
+    df = df.copy()
+    
+    # Verificar columnas requeridas
+    required = {'DPTO', 'ESPECIE', 'VOLUMEN_M3'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
+    
+    # Calcular volumen total por departamento y especie
+    dept_species = df.groupby(['DPTO', 'ESPECIE'], observed=False)['VOLUMEN_M3']\
+                   .sum()\
+                   .reset_index()
+    
+    return dept_species
+
+def plot_comparison_chart(df, top_n=5):
+    """Crea visualización interactiva de comparación entre departamentos."""
+    # Obtener top N especies por departamento
+    top_species = df.groupby('DPTO', observed=False)\
+                  .apply(lambda x: x.nlargest(top_n, 'VOLUMEN_M3'))\
+                  .reset_index(drop=True)
+    
+    # Crear gráfico
+    fig = px.bar(top_species,
+                x='DPTO',
+                y='VOLUMEN_M3',
+                color='ESPECIE',
+                barmode='group',
+                title=f'Distribución de Top {top_n} Especies por Departamento',
+                labels={'VOLUMEN_M3': 'Volumen (m³)', 'DPTO': 'Departamento'},
+                height=600)
+    
+    fig.update_layout(xaxis={'categoryorder':'total descending'},
+                    hovermode='x unified')
+    return fig
+    
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -642,6 +681,68 @@ def main():
                         "text/csv",
                         key='download-low-volume'
                     )
+                
+            except ValueError as e:
+                st.error(str(e))
+
+        # Nueva sección de comparación entre departamentos
+            st.header("📊 Comparación entre Departamentos")
+            
+            try:
+                comparison_data = compare_species_distribution(df_clean)
+                
+                # Controles interactivos
+                col1, col2 = st.columns(2)
+                selected_depts = col1.multiselect(
+                    'Seleccionar departamentos:',
+                    options=comparison_data['DPTO'].unique(),
+                    default=comparison_data['DPTO'].unique()[:3]
+                )
+                
+                top_n = col2.slider('Número de especies a mostrar:', 
+                                   min_value=1, 
+                                   max_value=10, 
+                                   value=5)
+                
+                # Filtrar datos
+                filtered_data = comparison_data[comparison_data['DPTO'].isin(selected_depts)]
+                
+                # Mostrar métricas
+                cols = st.columns(3)
+                cols[0].metric("🗺️ Departamentos Seleccionados", len(selected_depts))
+                cols[1].metric("🌿 Especies Únicas", filtered_data['ESPECIE'].nunique())
+                cols[2].metric("📦 Volumen Total", f"{filtered_data['VOLUMEN_M3'].sum():,.0f} m³")
+                
+                # Gráfico principal
+                st.subheader("Distribución Comparativa")
+                fig = plot_comparison_chart(filtered_data, top_n)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Vista de tabla
+                st.subheader("Tabla Comparativa")
+                pivot_table = filtered_data.pivot_table(
+                    index='DPTO',
+                    columns='ESPECIE',
+                    values='VOLUMEN_M3',
+                    aggfunc='sum'
+                ).fillna(0)
+                
+                # Convertir a porcentaje relativo opcional
+                if st.checkbox('Mostrar como porcentaje relativo por departamento'):
+                    pivot_table = pivot_table.div(pivot_table.sum(axis=1), axis=0) * 100
+                
+                st.dataframe(pivot_table.style.format("{:.1f}"),
+                            use_container_width=True)
+                
+                # Descarga de datos
+                csv = pivot_table.to_csv().encode('utf-8')
+                st.download_button(
+                    "📥 Descargar tabla comparativa",
+                    csv,
+                    "comparacion_departamentos.csv",
+                    "text/csv",
+                    key='download-comparison'
+                )
                 
             except ValueError as e:
                 st.error(str(e))
