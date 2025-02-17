@@ -128,6 +128,7 @@ def handle_missing_values(df):
     
     return df_filled
 
+
 def prepare_geo_data(df):
     """Prepara los datos geográficos y los fusiona con los datos de volumen."""
     # Cargar dataset geográfico
@@ -136,34 +137,32 @@ def prepare_geo_data(df):
     
     # Normalizar nombres para hacer el merge
     df['DPTO'] = df['DPTO'].apply(lambda x: unidecode(x).upper().strip())
-    df['MUNICIPIO'] = df['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
-    
-    geo_df['departamento'] = geo_df['departamento'].apply(lambda x: unidecode(x).upper().strip())
-    geo_df['municipio'] = geo_df['municipio'].apply(lambda x: unidecode(x).upper().strip())
+    geo_df['NOM_DPTO'] = geo_df['NOM_DPTO'].apply(lambda x: unidecode(x).upper().strip())
     
     # Calcular volumen total por departamento
     volume_by_dept = df.groupby('DPTO')['VOLUMEN M3'].sum().reset_index()
     
     # Fusionar datos geográficos con volúmenes
     merged = geo_df.merge(volume_by_dept, 
-                        left_on='departamento',
+                        left_on='NOM_DPTO',
                         right_on='DPTO',
                         how='inner')
     
-    # Crear GeoDataFrame
+    # Crear GeoDataFrame con las coordenadas correctas
     gdf = gpd.GeoDataFrame(
         merged,
-        geometry=gpd.points_from_xy(merged.longitud, merged.latitud)
+        geometry=gpd.points_from_xy(merged.LONGITUD, merged.LATITUD)
     )
     
     return gdf
+
 
 def create_heatmap(gdf):
     """Crea un mapa de calor interactivo usando PyDeck."""
     layer = pdk.Layer(
         "HeatmapLayer",
         data=gdf,
-        get_position=["longitud", "latitud"],
+        get_position=["LONGITUD", "LATITUD"],
         get_weight="VOLUMEN M3",
         opacity=0.8,
         threshold=0.05,
@@ -171,7 +170,7 @@ def create_heatmap(gdf):
     )
     
     view_state = pdk.ViewState(
-        latitude=4.5709,  # Centro de Colombia
+        latitude=4.5709,
         longitude=-74.2973,
         zoom=5,
         pitch=40.5,
@@ -182,7 +181,7 @@ def create_heatmap(gdf):
         layers=[layer],
         initial_view_state=view_state,
         tooltip={
-            "html": "<b>Departamento:</b> {departamento}<br><b>Volumen:</b> {VOLUMEN M3} m³",
+            "html": "<b>Departamento:</b> {NOM_DPTO}<br><b>Volumen:</b> {VOLUMEN M3} m³",
             "style": {"backgroundColor": "steelblue", "color": "white"}
         }
     )
