@@ -573,10 +573,10 @@ def load_region_mapping():
             'REGION': ['CARIBE', 'ANDINA', 'PACIFICO', 'ORINOQUIA', 'AMAZONIA'],
             'DPTOS': [
                 ['ATLANTICO', 'BOLIVAR', 'CESAR', 'CORDOBA', 'MAGDALENA', 'SUCRE', 'LA GUAJIRA'],
-                ['ANTIOQUIA', 'BOYACA', 'CUNDINAMARCA', 'HUILA', 'TOLIMA', 'SANTANDER'],
+                ['ANTIOQUIA', 'BOYACA', 'CUNDINAMARCA', 'HUILA', 'TOLIMA', 'SANTANDER', 'NORTE DE SANTANDER', 'QUINDIO', 'CALDAS', 'NARINO', 'RISARALDA'],
                 ['CAUCA', 'CHOCO', 'NARIÑO', 'VALLE DEL CAUCA'],
                 ['ARAUCA', 'CASANARE', 'META', 'VICHADA'],
-                ['AMAZONAS', 'GUAINIA', 'GUAVIARE', 'PUTUMAYO', 'VAUPES']
+                ['AMAZONAS', 'GUAINIA', 'GUAVIARE', 'PUTUMAYO', 'VAUPES', 'CAQUETA']
             ]
         }
         return pd.DataFrame(default_regions).explode('DPTOS')
