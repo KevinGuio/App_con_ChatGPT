@@ -313,6 +313,64 @@ def plot_municipality_volumes(gdf):
     return fig
 
 
+def get_low_volume_species(df, top_n=5):
+    """Identifica las especies con menor volumen movilizado."""
+    df = df.copy()
+    
+    if 'ESPECIE' not in df.columns or 'VOLUMEN_M3' not in df.columns:
+        raise ValueError("Columnas requeridas no encontradas")
+    
+    # Calcular volumen total por especie
+    species_vol = df.groupby('ESPECIE', observed=False)['VOLUMEN_M3']\
+                   .sum()\
+                   .reset_index()\
+                   .sort_values('VOLUMEN_M3', ascending=True)
+    
+    # Filtrar las N especies con menor volumen
+    return species_vol.head(top_n)
+
+def get_species_geo_distribution(df, low_species):
+    """Obtiene la distribución geográfica de especies de bajo volumen."""
+    df = df.copy()
+    
+    # Filtrar datos para las especies seleccionadas
+    filtered = df[df['ESPECIE'].isin(low_species['ESPECIE'])]
+    
+    # Cargar y combinar datos geográficos
+    geo_url = "https://raw.githubusercontent.com/KevinGuio/App_con_ChatGPT/main/DIVIPOLA-_C_digos_municipios_geolocalizados_20250217.csv"
+    geo_df = pd.read_csv(geo_url)
+    
+    # Normalizar nombres
+    filtered['MUNICIPIO'] = filtered['MUNICIPIO'].apply(lambda x: unidecode(x).upper().strip())
+    geo_df['NOM_MPIO'] = geo_df['NOM_MPIO'].apply(lambda x: unidecode(x).upper().strip())
+    
+    # Combinar datos
+    merged = geo_df.merge(filtered,
+                        left_on=['NOM_DPTO', 'NOM_MPIO'],
+                        right_on=['DPTO', 'MUNICIPIO'],
+                        how='right')
+    
+    return merged[['ESPECIE', 'DPTO', 'MUNICIPIO', 'LATITUD', 'LONGITUD', 'VOLUMEN_M3']]
+
+def plot_low_volume_distribution(gdf):
+    """Crea mapa interactivo de distribución de especies de bajo volumen."""
+    fig = px.scatter_mapbox(gdf,
+                          lat='LATITUD',
+                          lon='LONGITUD',
+                          color='ESPECIE',
+                          size='VOLUMEN_M3',
+                          hover_name='MUNICIPIO',
+                          hover_data={'DPTO': True, 'ESPECIE': True, 'VOLUMEN_M3': ':.2f'},
+                          zoom=4.5,
+                          height=600,
+                          title='Distribución Geográfica de Especies con Bajo Volumen',
+                          mapbox_style="carto-positron")
+    
+    fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0},
+                    legend={'title': None, 'orientation': 'h', 'y': -0.2})
+    return fig
+
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -530,6 +588,60 @@ def main():
                     "text/csv",
                     key='download-municipios'
                 )
+                
+            except ValueError as e:
+                st.error(str(e))
+
+        # Nueva sección de especies de bajo volumen
+            st.header("🔍 Especies con Menor Movilización")
+            
+            try:
+                # Selector de cantidad de especies
+                n_species = st.slider('Número de especies a analizar:', 
+                                     min_value=1, 
+                                     max_value=10, 
+                                     value=3)
+                
+                # Obtener especies de bajo volumen
+                low_species = get_low_volume_species(df_clean, n_species)
+                
+                # Mostrar métricas
+                cols = st.columns(3)
+                cols[0].metric("🌿 Especies Identificadas", len(low_species))
+                cols[1].metric("📦 Volumen Total", f"{low_species['VOLUMEN_M3'].sum():,.2f} m³")
+                cols[2].metric("🏙️ Municipios Afectados", 
+                              get_species_geo_distribution(df_clean, low_species)['MUNICIPIO'].nunique())
+                
+                # Gráfico de barras
+                st.subheader(f"Top {n_species} Especies con Menor Volumen")
+                fig_bar = px.bar(low_species,
+                                x='VOLUMEN_M3',
+                                y='ESPECIE',
+                                orientation='h',
+                                labels={'VOLUMEN_M3': 'Volumen Total (m³)', 'ESPECIE': ''},
+                                color='VOLUMEN_M3',
+                                color_continuous_scale='Reds')
+                st.plotly_chart(fig_bar, use_container_width=True)
+                
+                # Mapa de distribución
+                st.subheader("Distribución Geográfica")
+                geo_data = get_species_geo_distribution(df_clean, low_species)
+                fig_map = plot_low_volume_distribution(geo_data)
+                st.plotly_chart(fig_map, use_container_width=True)
+                
+                # Tabla detallada
+                with st.expander("📋 Ver datos detallados"):
+                    st.dataframe(geo_data.sort_values(['VOLUMEN_M3', 'DPTO'], ascending=[True, True]))
+                    
+                    # Botón de descarga
+                    csv = geo_data.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Descargar datos geográficos",
+                        csv,
+                        f"especies_bajo_volumen_{n_species}.csv",
+                        "text/csv",
+                        key='download-low-volume'
+                    )
                 
             except ValueError as e:
                 st.error(str(e))
