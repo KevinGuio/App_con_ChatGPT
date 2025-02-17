@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import geopandas as gpd
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 import plotly.express as px
+import geopandas as gpd
 from unidecode import unidecode
 
 def load_data(uploaded_file=None, url=None):
@@ -408,6 +411,84 @@ def plot_comparison_chart(df, top_n=5):
     fig.update_layout(xaxis={'categoryorder':'total descending'},
                     hovermode='x unified')
     return fig
+
+def prepare_clustering_data(df, level='department'):
+    """Prepara los datos para clustering agrupando por nivel geográfico."""
+    df = df.copy()
+    
+    # Agrupar datos según nivel seleccionado
+    if level == 'department':
+        group_col = 'DPTO'
+    else:
+        group_col = 'MUNICIPIO'
+    
+    # Crear características para el clustering
+    features = df.groupby(group_col, observed=False).agg({
+        'VOLUMEN_M3': ['sum', 'mean', 'std'],
+        'ESPECIE': pd.Series.nunique,
+        'TIPO_PRODUCTO': pd.Series.nunique
+    }).reset_index()
+    
+    # Renombrar columnas
+    features.columns = [
+        group_col,
+        'volumen_total',
+        'volumen_promedio',
+        'volumen_std',
+        'especies_unicas',
+        'productos_unicos'
+    ]
+    
+    # Manejar valores NaN
+    features.fillna(0, inplace=True)
+    
+    return features
+
+def perform_clustering(data, n_clusters=3):
+    """Realiza el clustering usando K-means con reducción dimensional."""
+    # Escalar características
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data)
+    
+    # Reducción dimensional
+    pca = PCA(n_components=2)
+    principal_components = pca.fit_transform(scaled_data)
+    
+    # Clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    clusters = kmeans.fit_predict(scaled_data)
+    
+    # Crear DataFrame con resultados
+    results = pd.DataFrame({
+        'cluster': clusters,
+        'PC1': principal_components[:, 0],
+        'PC2': principal_components[:, 1]
+    })
+    
+    return results, pca, scaler, kmeans
+
+def plot_clusters_on_map(geo_data, cluster_data, level='department'):
+    """Muestra los clusters en un mapa interactivo."""
+    # Combinar datos geográficos con clusters
+    merged = geo_data.merge(cluster_data, on='DPTO' if level == 'department' else 'MUNICIPIO')
+    
+    # Crear mapa
+    fig = px.scatter_mapbox(merged,
+                          lat='LATITUD',
+                          lon='LONGITUD',
+                          color='cluster',
+                          size='volumen_total',
+                          hover_name='DPTO' if level == 'department' else 'MUNICIPIO',
+                          hover_data=['volumen_total', 'especies_unicas', 'productos_unicos'],
+                          zoom=4.5,
+                          height=600,
+                          title='Clusters de Movilización Maderera',
+                          color_continuous_scale=px.colors.cyclical.IceFire,
+                          mapbox_style="carto-positron")
+    
+    fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0},
+                    coloraxis_showscale=False)
+    return fig
     
 
 def main():
@@ -742,6 +823,69 @@ def main():
                     "comparacion_departamentos.csv",
                     "text/csv",
                     key='download-comparison'
+                )
+                
+            except ValueError as e:
+                st.error(str(e))
+
+        # Nueva sección de clustering
+            st.header("🔍 Clustering Geográfico")
+            
+            try:
+                # Selección de parámetros
+                col1, col2 = st.columns(2)
+                level = col1.radio("Nivel de análisis:", 
+                                 ['department', 'municipality'], 
+                                 format_func=lambda x: 'Departamento' if x == 'department' else 'Municipio')
+                n_clusters = col2.slider('Número de clusters:', 2, 6, 3)
+                
+                # Preparar datos
+                clustering_data = prepare_clustering_data(df_clean, level)
+                geo_data = prepare_geo_data(df_clean)
+                
+                # Realizar clustering
+                cluster_results, pca, scaler, model = perform_clustering(
+                    clustering_data.drop(columns=[clustering_data.columns[0]]), 
+                    n_clusters
+                )
+                
+                # Combinar resultados
+                full_results = pd.concat([
+                    clustering_data,
+                    cluster_results
+                ], axis=1)
+                
+                # Mostrar análisis
+                st.subheader("Resultados del Clustering")
+                
+                # Gráfico PCA
+                fig_pca = px.scatter(full_results, 
+                                    x='PC1', 
+                                    y='PC2', 
+                                    color='cluster',
+                                    hover_name=clustering_data.columns[0],
+                                    title='Visualización de Clusters en Espacio PCA')
+                st.plotly_chart(fig_pca, use_container_width=True)
+                
+                # Mapa de clusters
+                st.subheader("Distribución Geográfica de Clusters")
+                fig_map = plot_clusters_on_map(geo_data, full_results, level)
+                st.plotly_chart(fig_map, use_container_width=True)
+                
+                # Interpretación de clusters
+                st.subheader("Características de los Clusters")
+                cluster_profile = full_results.groupby('cluster').mean()
+                st.dataframe(cluster_profile.style.background_gradient(cmap='Blues'),
+                            use_container_width=True)
+                
+                # Descarga de resultados
+                csv = full_results.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Descargar resultados de clustering",
+                    csv,
+                    f"clusters_{level}.csv",
+                    "text/csv",
+                    key='download-clusters'
                 )
                 
             except ValueError as e:
