@@ -292,7 +292,7 @@ def main():
                 
                 # Mostrar métricas
                 total_volume = filtered_data['VOLUMEN_TOTAL'].sum()
-                year_range = f"{filtered_data['AÑO'].min()} - {filtered_data['AÑO'].max()}"
+                year_range = f"{filtered_data['ANO'].min()} - {filtered_data['ANO'].max()}"
                 
                 st.metric("📦 Volumen Total en Período Seleccionado", 
                          f"{total_volume:,.0f} m³", 
@@ -304,7 +304,7 @@ def main():
                 
                 # Mostrar datos subyacentes
                 with st.expander("🔍 Ver datos detallados"):
-                    st.dataframe(filtered_data.sort_values(['AÑO', 'VOLUMEN_TOTAL'], ascending=False))
+                    st.dataframe(filtered_data.sort_values(['ANO', 'VOLUMEN_TOTAL'], ascending=False))
                 
             except ValueError as e:
                 st.error(str(e))
