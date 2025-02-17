@@ -80,6 +80,35 @@ def get_top_species(df):
     
     return top_species.drop(columns='Rank')
 
+def plot_top_10_species(df):
+    """Genera gráfico de barras con las 10 especies con mayor volumen total.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con datos procesados
+        
+    Returns:
+        matplotlib.figure.Figure: Gráfico de barras
+    """
+    # Verificar columnas requeridas
+    if 'ESPECIE' not in df.columns or 'VOLUMEN M3' not in df.columns:
+        raise ValueError("Dataset no contiene las columnas requeridas")
+    
+    # Calcular totales por especie
+    species_volume = df.groupby('ESPECIE', observed=True)['VOLUMEN M3']\
+                      .sum()\
+                      .nlargest(10)\
+                      .sort_values(ascending=True)  # Para mejor visualización
+    
+    # Crear gráfico
+    fig = plt.figure(figsize=(10, 6))
+    species_volume.plot(kind='barh', color='#1f77b4')
+    plt.title('Top 10 Especies con Mayor Volumen Movilizado')
+    plt.xlabel('Volumen Total (m³)')
+    plt.ylabel('Especie')
+    plt.tight_layout()
+    
+    return fig
+
 def main():
     """Función principal para la aplicación Streamlit."""
     st.title("Análisis de Producción Maderera")
@@ -123,16 +152,17 @@ def main():
                 st.write("Valores faltantes después de interpolación:")
                 st.write(cleaned_nulls)
 
-            # Nueva funcionalidad: Top especies
-            st.header("Análisis de Especies por Departamento")
+            # Análisis de especies
+            st.header("Análisis de Especies")
             
             try:
+                # Top 5 por departamento
                 top_species = get_top_species(df_clean)
                 
                 st.subheader("Top 5 Especies por Volumen y Departamento")
                 st.dataframe(top_species)
                 
-                # Mostrar métricas resumidas
+                # Métricas
                 total_volume = top_species['VOLUMEN M3'].sum()
                 avg_volume = top_species['VOLUMEN M3'].mean()
                 total_species = top_species['ESPECIE'].nunique()
@@ -142,10 +172,14 @@ def main():
                 cols[1].metric("Promedio por Especie", f"{avg_volume:,.2f}")
                 cols[2].metric("Especies Únicas Top 5", total_species)
                 
-                # Gráfico adicional
-                st.subheader("Distribución de Volúmenes Top 5")
-                chart_data = top_species.groupby('DPTO')['VOLUMEN M3'].sum()
-                st.bar_chart(chart_data)
+                # Nuevo gráfico top 10 global
+                st.subheader("Top 10 Especies a Nivel Nacional")
+                top_10 = df_clean.groupby('ESPECIE')['VOLUMEN M3']\
+                                .sum()\
+                                .nlargest(10)\
+                                .reset_index()
+                                
+                st.bar_chart(top_10.set_index('ESPECIE'))
                 
             except ValueError as e:
                 st.warning(str(e))
