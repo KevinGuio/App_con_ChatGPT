@@ -154,6 +154,42 @@ def plot_municipality_map(df):
     return fig
 
 
+def get_temporal_evolution(df):
+    """Analiza la evolución temporal por especie y tipo de producto."""
+    df = df.copy()
+    
+    # Verificar columnas requeridas
+    required = {'AÑO', 'ESPECIE', 'TIPO_PRODUCTO', 'VOLUMEN_M3'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Columnas faltantes: {', '.join(missing)}")
+    
+    # Agrupar y sumar volúmenes
+    evolution = df.groupby(['AÑO', 'ESPECIE', 'TIPO_PRODUCTO'], observed=False)\
+                .agg(VOLUMEN_TOTAL=('VOLUMEN_M3', 'sum'))\
+                .reset_index()
+    
+    return evolution
+
+def plot_temporal_evolution(df):
+    """Crea gráfico interactivo de evolución temporal."""
+    fig = px.line(df,
+                 x='AÑO',
+                 y='VOLUMEN_TOTAL',
+                 color='ESPECIE',
+                 line_dash='TIPO_PRODUCTO',
+                 markers=True,
+                 title='Evolución Temporal del Volumen por Especie y Tipo de Producto',
+                 labels={'VOLUMEN_TOTAL': 'Volumen (m³)', 'AÑO': 'Año'},
+                 height=600)
+    
+    fig.update_layout(hovermode='x unified',
+                    xaxis={'type': 'category'},
+                    legend={'title': None})
+    
+    return fig
+    
+
 def main():
     st.title("🌳 Análisis de Producción Maderera")
     
@@ -227,7 +263,53 @@ def main():
                 
             except ValueError as e:
                 st.error(str(e))
-            
+
+
+            # Nueva sección de análisis temporal
+            st.header("📅 Evolución Temporal")
+            try:
+                temporal_data = get_temporal_evolution(df_clean)
+                
+                # Filtros interactivos
+                cols = st.columns(2)
+                selected_species = cols[0].multiselect(
+                    'Seleccionar especies:',
+                    options=temporal_data['ESPECIE'].unique(),
+                    default=temporal_data['ESPECIE'].unique()[:3]
+                )
+                
+                selected_products = cols[1].multiselect(
+                    'Seleccionar tipos de producto:',
+                    options=temporal_data['TIPO_PRODUCTO'].unique(),
+                    default=temporal_data['TIPO_PRODUCTO'].unique()[:2]
+                )
+                
+                # Filtrar datos
+                filtered_data = temporal_data[
+                    (temporal_data['ESPECIE'].isin(selected_species)) &
+                    (temporal_data['TIPO_PRODUCTO'].isin(selected_products))
+                ]
+                
+                # Mostrar métricas
+                total_volume = filtered_data['VOLUMEN_TOTAL'].sum()
+                year_range = f"{filtered_data['AÑO'].min()} - {filtered_data['AÑO'].max()}"
+                
+                st.metric("📦 Volumen Total en Período Seleccionado", 
+                         f"{total_volume:,.0f} m³", 
+                         f"Período: {year_range}")
+                
+                # Mostrar gráfico
+                fig_temporal = plot_temporal_evolution(filtered_data)
+                st.plotly_chart(fig_temporal, use_container_width=True)
+                
+                # Mostrar datos subyacentes
+                with st.expander("🔍 Ver datos detallados"):
+                    st.dataframe(filtered_data.sort_values(['AÑO', 'VOLUMEN_TOTAL'], ascending=False))
+                
+            except ValueError as e:
+                st.error(str(e))
+
+        
         except Exception as e:
             st.error(f"🚨 Error general: {str(e)}")
 
