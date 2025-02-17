@@ -501,28 +501,6 @@ def perform_clustering(data, n_clusters=3):
     
     return results, pca, scaler, kmeans
 
-def plot_clusters_on_map(geo_data, cluster_data, level='department'):
-    """Muestra los clusters en un mapa interactivo."""
-    # Combinar datos geográficos con clusters
-    merged = geo_data.merge(cluster_data, on='DPTO' if level == 'department' else 'MUNICIPIO')
-    
-    # Crear mapa
-    fig = px.scatter_mapbox(merged,
-                          lat='LATITUD',
-                          lon='LONGITUD',
-                          color='cluster',
-                          size='volumen_total',
-                          hover_name='DPTO' if level == 'department' else 'MUNICIPIO',
-                          hover_data=['volumen_total', 'especies_unicas', 'productos_unicos'],
-                          zoom=4.5,
-                          height=600,
-                          title='Clusters de Movilización Maderera',
-                          color_continuous_scale=px.colors.cyclical.IceFire,
-                          mapbox_style="carto-positron")
-    
-    fig.update_layout(margin={"r":0,"t":40,"l":0,"b":0},
-                    coloraxis_showscale=False)
-    return fig
     
 
 def main():
@@ -901,26 +879,6 @@ def main():
                                     title='Visualización de Clusters en Espacio PCA')
                 st.plotly_chart(fig_pca, use_container_width=True)
                 
-                # Mapa de clusters
-                st.subheader("Distribución Geográfica de Clusters")
-                fig_map = plot_clusters_on_map(geo_data, full_results, level)
-                st.plotly_chart(fig_map, use_container_width=True)
-                
-                # Interpretación de clusters
-                st.subheader("Características de los Clusters")
-                cluster_profile = full_results.groupby('cluster').mean()
-                st.dataframe(cluster_profile.style.background_gradient(cmap='Blues'),
-                            use_container_width=True)
-                
-                # Descarga de resultados
-                csv = full_results.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "📥 Descargar resultados de clustering",
-                    csv,
-                    f"clusters_{level}.csv",
-                    "text/csv",
-                    key='download-clusters'
-                )
                 
             except ValueError as e:
                 st.error(str(e))
