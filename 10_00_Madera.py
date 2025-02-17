@@ -118,6 +118,16 @@ def main():
             
             with st.expander("🧹 Datos Procesados"):
                 st.dataframe(df_clean)
+
+            # Sección de Top 5 por Departamento
+            st.header("📊 Análisis por Departamento")
+            try:
+                top_species = get_top_species(df_clean)
+                st.dataframe(top_species)
+                
+            except ValueError as e:
+                st.error(str(e))
+
             
             # Sección de Top 10 Especies
             st.header("🏆 Top 10 Especies a Nivel Nacional")
@@ -138,14 +148,6 @@ def main():
             except ValueError as e:
                 st.error(str(e))
             
-            # Sección de Top 5 por Departamento
-            st.header("📊 Análisis por Departamento")
-            try:
-                top_species = get_top_species(df_clean)
-                st.dataframe(top_species)
-                
-            except ValueError as e:
-                st.error(str(e))
             
             # Mapa de Calor
             st.header("🌎 Mapa de Distribución")
