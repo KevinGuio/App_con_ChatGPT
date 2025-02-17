@@ -10,3 +10,4 @@ seaborn
 pydeck
 shapely
 unidecode
+plotly
